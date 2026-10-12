@@ -67,8 +67,8 @@ def negative_info(filename: str, esc: dict) -> tuple[str, str | None]:
     m = ESC_NAME.match(filename)
     if not m:
         # synthetic clip: strip the trailing index so repeats group together
-        stem = Path(filename).stem
-        return f"synth_{re.sub(r'\\d+$', '', stem)}", None
+        stem = re.sub(r"\d+$", "", Path(filename).stem)
+        return "synth_" + stem, None
     _, src, take, _ = m.groups()
     row = esc.get((src, take))
     group = f"esc_{src}_{take}"            # all 5 segments of one ESC-50 clip
