@@ -1,0 +1,80 @@
+# dronedet
+
+Acoustic drone detection — a dataset-only project. No hardware required.
+
+## Status
+
+| Step | What | State |
+|---|---|---|
+| 1 | Data foundation: manifest, splits, leakage tests | **done** |
+| 2 | Features + classical baseline | next |
+| 3 | CNN detector, tiered evaluation | |
+| 4 | Augmentation, SNR + distance curves | |
+| 5 | Calibration (temperature scaling, ECE) | |
+| 6 | Open-set head | |
+| 7 | Tracking / fusion layer (classical AI half) | |
+
+## Setup
+
+```bash
+pip install soundfile pandas pyarrow pytest librosa torch
+python scripts/build_manifest.py        # builds data/manifest.parquet
+python -m pytest tests -q               # 11 tests
+```
+
+The raw corpus is not committed. Fetch it with:
+
+```bash
+cd data
+git clone --depth 1 https://github.com/saraalemadi/DroneAudioDataset.git raw_droneaudio
+curl -O https://raw.githubusercontent.com/karolpiczak/ESC-50/master/meta/esc50.csv
+mv esc50.csv esc50_meta.csv
+```
+
+## What the data is
+
+11,704 one-second clips at 16 kHz, from Al-Emadi et al. (IWCMC 2019).
+
+- **1,332 drone clips** — Parrot Bebop and Mambo, recorded indoors, from 312 parent recordings
+- **10,372 background clips** — all 50 ESC-50 environmental classes at 200 each, plus 372 synthetic (silence, white/pink noise, taps)
+- **Imbalance 7.79 : 1** against the positive class, so accuracy is a meaningless metric here
+- **Hard confusers included**: 200 each of helicopter, chainsaw, vacuum cleaner, washing machine, engine, airplane
+
+## The two decisions that make results trustworthy
+
+**Splits are by parent recording, never by clip.** The dataset cuts every
+5-second recording into five 1-second slices, and those slices are
+near-duplicates. A random clip split puts the same flight in train and test;
+the model memorises and the score lies. `group_id` is the leakage unit, and
+the negatives get the same treatment — ESC-50 clips were sliced the same way,
+so all segments of one source clip share a group.
+
+Split assignment is a hash of `group_id`, so it is identical on every machine
+and across every run, with no seeds to get wrong.
+
+**Labels come from metadata, not filename arithmetic.** The background
+filenames keep ESC-50's naming with a segment digit appended, so you *can*
+recover the class as `last_field // 10` — but that disagrees with ESC-50's own
+metadata on about 20 of 10,000 files. We join on `(src_file, take)` against
+`esc50.csv` instead, and a test asserts zero mismatches.
+
+## Splits
+
+- **tier 1** — held-out recordings, same corpus. The everyday split (70/15/15 by group).
+- **tier 2** — held-out drone *model*: train on Bebop, test on Mambo. Answers "does it detect drones, or only the drones it saw?"
+- **tier 3** — held-out *corpus*. Column exists; needs a second dataset to fill.
+
+## Layout
+
+```
+src/dronedet/
+  contracts.py          shared types
+  data/manifest.py      build + validate the manifest
+scripts/build_manifest.py
+tests/test_manifest.py  11 tests, incl. an injected-leak check
+data/                   gitignored — raw corpus + manifest.parquet
+```
+
+`tests/test_manifest.py::test_validate_catches_injected_leak` deliberately
+corrupts a split and asserts the validator raises. A guard nobody has watched
+fail is not a guard.
