@@ -16,19 +16,34 @@ Acoustic drone detection — a dataset-only project. No hardware required.
 
 ## Setup
 
+macOS ships a Homebrew Python that refuses system-wide installs (PEP 668),
+so the project uses a virtual environment. Do this once:
+
 ```bash
-pip install soundfile pandas pyarrow pytest librosa torch
+cd /Users/kathandesai/drone
+python3 -m venv .venv
+source .venv/bin/activate          # every new terminal needs this line
+pip install -r requirements.txt
+```
+
+You know it worked when your prompt shows `(.venv)`. Then:
+
+```bash
 python scripts/build_manifest.py        # builds data/manifest.parquet
 python -m pytest tests -q               # 11 tests
 ```
+
+In VS Code, press ⇧⌘P → "Python: Select Interpreter" → pick the one inside
+`.venv`, so the editor and the terminal agree.
 
 The raw corpus is not committed. Fetch it with:
 
 ```bash
 cd data
 git clone --depth 1 https://github.com/saraalemadi/DroneAudioDataset.git raw_droneaudio
-curl -O https://raw.githubusercontent.com/karolpiczak/ESC-50/master/meta/esc50.csv
-mv esc50.csv esc50_meta.csv
+rm -rf raw_droneaudio/.git
+curl -o esc50_meta.csv https://raw.githubusercontent.com/karolpiczak/ESC-50/master/meta/esc50.csv
+cd ..
 ```
 
 ## What the data is
