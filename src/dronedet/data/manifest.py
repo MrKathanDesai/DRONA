@@ -8,6 +8,8 @@ from pathlib import Path
 import pandas as pd
 import soundfile as sf
 
+from dronedet.paths import DATA_DIR
+
 ESC_NAME = re.compile(r"^(\d+)-(\d+)-([A-Z])-(\d+)\.wav$")
 
 
@@ -67,7 +69,8 @@ def assign_tier2(row) -> str:
 MIN_DURATION = 0.3
 
 
-def build(root: Path, esc_csv: Path, source: str = "droneaudio") -> pd.DataFrame:
+def build(root: Path, esc_csv: Path, source: str = "droneaudio",
+          data_dir: Path = DATA_DIR) -> pd.DataFrame:
     esc = load_esc50(esc_csv)
     rows = []
     for label, folder in (("drone", "yes_drone"), ("background", "unknown")):
@@ -81,7 +84,7 @@ def build(root: Path, esc_csv: Path, source: str = "droneaudio") -> pd.DataFrame
                 model = None
             info = sf.info(str(p))
             rows.append(dict(
-                path=str(p), label=label, group_id=group, source=source,
+                path=p.relative_to(data_dir).as_posix(), label=label, group_id=group, source=source,
                 drone_model=model, bg_category=cat,
                 sample_rate=info.samplerate, duration=round(info.duration, 4),
             ))
@@ -114,6 +117,11 @@ def validate(df: pd.DataFrame) -> dict:
             problems.append(
                 f"{tier}: {len(overlap)} group(s) span multiple splits, "
                 f"e.g. {list(overlap.index[:3])}")
+
+    absolute = df.path.map(lambda p: Path(p).is_absolute())
+    if absolute.any():
+        problems.append(f"{int(absolute.sum())} absolute path(s); "
+                        "paths must be relative to the data directory")
 
     if df.path.duplicated().any():
         problems.append(f"{int(df.path.duplicated().sum())} duplicate paths")

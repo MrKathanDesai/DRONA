@@ -7,7 +7,7 @@ Acoustic drone detection — a dataset-only project. No hardware required.
 | Step | What | State |
 |---|---|---|
 | 1 | Data foundation: manifest, splits, leakage tests | **done** |
-| 2 | Features + classical baseline | next |
+| 2 | Features + classical baseline | features **done**, baseline next |
 | 3 | CNN detector, tiered evaluation | |
 | 4 | Augmentation, SNR + distance curves | |
 | 5 | Calibration (temperature scaling, ECE) | |
@@ -30,7 +30,8 @@ You know it worked when your prompt shows `(.venv)`. Then:
 
 ```bash
 python scripts/build_manifest.py        # builds data/manifest.parquet
-python -m pytest tests -q               # 11 tests
+python scripts/make_features.py         # caches log-mel features (~10 s)
+python -m pytest tests -q               # 22 tests
 ```
 
 In VS Code, press ⇧⌘P → "Python: Select Interpreter" → pick the one inside
@@ -55,7 +56,7 @@ cd ..
 - **Imbalance 7.79 : 1** against the positive class, so accuracy is a meaningless metric here
 - **Hard confusers included**: 200 each of helicopter, chainsaw, vacuum cleaner, washing machine, engine, airplane
 
-## The two decisions that make results trustworthy
+## The three decisions that make results trustworthy
 
 **Splits are by parent recording, never by clip.** The dataset cuts every
 5-second recording into five 1-second slices, and those slices are
@@ -73,6 +74,14 @@ recover the class as `last_field // 10` — but that disagrees with ESC-50's own
 metadata on about 20 of 10,000 files. We join on `(src_file, take)` against
 `esc50.csv` instead, and a test asserts zero mismatches.
 
+**Clips are never zero-padded.** Clip duration identifies the class almost
+perfectly here: drone clips are 1.024 s, background clips 1.0217 / 0.975 /
+0.960 s and so on, and every distinct duration belongs to one class. Pad
+short clips with silence and the length of the silent tail gives away the
+label. `fix_length` centre-crops long clips and loops short ones, and a test
+confirms it: the same noise at two lengths gives the same features. That
+test was checked to fail under zero-padding.
+
 ## Splits
 
 - **tier 1** — held-out recordings, same corpus. The everyday split (70/15/15 by group).
@@ -84,10 +93,14 @@ metadata on about 20 of 10,000 files. We join on `(src_file, take)` against
 ```
 src/dronedet/
   contracts.py          shared types
+  paths.py              data root (override with DRONEDET_DATA)
   data/manifest.py      build + validate the manifest
+  features/audio.py     load, fix length, log-mel
 scripts/build_manifest.py
-tests/test_manifest.py  11 tests, incl. an injected-leak check
-data/                   gitignored — raw corpus + manifest.parquet
+scripts/make_features.py
+tests/test_manifest.py        11 tests, incl. an injected-leak check
+tests/test_audio_features.py  11 tests, incl. cache-reproduces-from-code
+data/                   gitignored — raw corpus, manifest, feature cache
 ```
 
 `tests/test_manifest.py::test_validate_catches_injected_leak` deliberately

@@ -9,10 +9,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import pandas as pd
 from dronedet.data import manifest as M
+from dronedet.paths import DATA_DIR
 
-RAW = ROOT / "data" / "raw_droneaudio" / "Binary_Drone_Audio"
-ESC = ROOT / "data" / "esc50_meta.csv"
-OUT = ROOT / "data" / "manifest.parquet"
+RAW = DATA_DIR / "raw_droneaudio" / "Binary_Drone_Audio"
+ESC = DATA_DIR / "esc50_meta.csv"
+OUT = DATA_DIR / "manifest.parquet"
 
 
 def main() -> int:
@@ -21,6 +22,7 @@ def main() -> int:
     stats = M.validate(df)
 
     df.to_parquet(OUT, index=False)
+    df.to_csv(OUT.with_suffix(".csv"), index=False)
 
     print("\n" + "=" * 64)
     print("  MANIFEST")
@@ -63,7 +65,7 @@ def main() -> int:
             print(f"    {sp:10s} drone {row.get('drone',0):5d}   "
                   f"background {row.get('background',0):6d}")
 
-    print(f"\n  written to {OUT.relative_to(ROOT)}")
+    print(f"\n  written to {OUT}")
     print("  validation PASSED — no group spans a split\n")
     return 0
 
