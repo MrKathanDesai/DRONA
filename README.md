@@ -7,7 +7,8 @@ Acoustic drone detection — a dataset-only project. No hardware required.
 | Step | What | State |
 |---|---|---|
 | 1 | Data foundation: manifest, splits, leakage tests | **done** |
-| 2 | Features + classical baseline | features **done**, baseline next |
+| 2 | Features + classical baseline | **done** — see `reports/baseline_audio.md` |
+| 2b | Tier 3: Svanström outdoor audio into the manifest | next |
 | 3 | CNN detector, tiered evaluation | |
 | 4 | Augmentation, SNR + distance curves | |
 | 5 | Calibration (temperature scaling, ECE) | |
@@ -31,7 +32,8 @@ You know it worked when your prompt shows `(.venv)`. Then:
 ```bash
 python scripts/build_manifest.py        # builds data/manifest.parquet
 python scripts/make_features.py         # caches log-mel features (~10 s)
-python -m pytest tests -q               # 22 tests
+python scripts/train_baseline.py        # baseline + report (~2 min)
+python -m pytest tests -q               # 27 tests
 ```
 
 In VS Code, press ⇧⌘P → "Python: Select Interpreter" → pick the one inside
@@ -82,6 +84,32 @@ label. `fix_length` centre-crops long clips and loops short ones, and a test
 confirms it: the same noise at two lengths gives the same features. That
 test was checked to fail under zero-padding.
 
+How much this matters: a classifier given *only* clip duration separates
+the classes perfectly (separability 1.0), and one given only overall
+loudness reaches 0.79. Neither enters the features — the baseline's are
+level-invariant by construction, and a test checks it. The loop splice was
+checked too: cutting full-length drone test clips to background lengths
+and looping them moves the median score by 0.0000.
+
+## Baseline results (step 2)
+
+Level-invariant log-mel summary statistics with gradient boosting; the
+threshold is fixed at 1% false-alarm rate on validation, then applied to
+test. CIs resample whole recordings.
+
+| split | PR-AUC [95% CI] | recall | test false alarms |
+|---|---|---|---|
+| tier 1 (held-out recordings) | 0.981 [0.954, 0.998] | 0.935 | 3 / 1759 |
+| tier 2 (train Bebop, test Mambo) | 0.891 [0.845, 0.927] | 0.393 | 14 / 2113 |
+
+Tier 1 looks nearly solved; tier 2 shows why that is not the whole story.
+At the same operating point, recall on an unseen drone model collapses from
+94% to 39%: the baseline has partly learned *Bebop*, not *drone*. Tier 1
+also has zero helicopter / engine / airplane false alarms, which more
+likely reflects indoor-vs-ESC-50 recording differences than real
+discrimination. Tier 3 (outdoor, different hardware) is the test that
+decides.
+
 ## Splits
 
 - **tier 1** — held-out recordings, same corpus. The everyday split (70/15/15 by group).
@@ -96,10 +124,15 @@ src/dronedet/
   paths.py              data root (override with DRONEDET_DATA)
   data/manifest.py      build + validate the manifest
   features/audio.py     load, fix length, log-mel
+  models/baseline.py    level-invariant summary features + sklearn models
+  eval/metrics.py       threshold at FPR, grouped bootstrap, per-category FA
 scripts/build_manifest.py
 scripts/make_features.py
+scripts/train_baseline.py
+reports/baseline_audio.{md,json}
 tests/test_manifest.py        11 tests, incl. an injected-leak check
 tests/test_audio_features.py  11 tests, incl. cache-reproduces-from-code
+tests/test_baseline.py        5 tests, incl. level invariance
 data/                   gitignored — raw corpus, manifest, feature cache
 ```
 
