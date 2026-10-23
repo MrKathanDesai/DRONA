@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""Build the manifest and print what's in it.
-
-    python scripts/build_manifest.py
-"""
 from __future__ import annotations
 
 import sys
@@ -11,8 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-import pandas as pd                                        # noqa: E402
-from dronedet.data import manifest as M                    # noqa: E402
+import pandas as pd
+from dronedet.data import manifest as M
 
 RAW = ROOT / "data" / "raw_droneaudio" / "Binary_Drone_Audio"
 ESC = ROOT / "data" / "esc50_meta.csv"
@@ -22,7 +18,7 @@ OUT = ROOT / "data" / "manifest.parquet"
 def main() -> int:
     print("scanning audio (reads a header per file, takes a moment)...")
     df = M.build(RAW, ESC)
-    stats = M.validate(df)                 # raises if anything leaks
+    stats = M.validate(df)
 
     df.to_parquet(OUT, index=False)
 
