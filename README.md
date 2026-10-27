@@ -8,9 +8,9 @@ Acoustic drone detection — a dataset-only project. No hardware required.
 |---|---|---|
 | 1 | Data foundation: manifest, splits, leakage tests | **done** |
 | 2 | Features + classical baseline | **done** — see `reports/baseline_audio.md` |
-| 2b | Tier 3: Svanström outdoor audio into the manifest | next |
-| 3 | CNN detector, tiered evaluation | |
-| 4 | Augmentation, SNR + distance curves | |
+| 2b | Tier 3: Svanström outdoor audio into the manifest | **done** |
+| 3 | Pretrained detector (frozen AudioSet CNN + small head), tiered evaluation, `detect.py` demo | **done** — see `reports/pretrained_audio.md` |
+| 4 | Augmentation (outdoor noise, music masking), SNR curves | next |
 | 5 | Calibration (temperature scaling, ECE) | |
 | 6 | Open-set head | |
 | 7 | Tracking / fusion layer (classical AI half) | |
@@ -33,21 +33,18 @@ You know it worked when your prompt shows `(.venv)`. Then:
 python scripts/build_manifest.py        # builds data/manifest.parquet
 python scripts/make_features.py         # caches log-mel features (~10 s)
 python scripts/train_baseline.py        # baseline + report (~2 min)
-python -m pytest tests -q               # 27 tests
+python scripts/make_embeddings.py       # frozen encoder, one pass (~30 s)
+python scripts/train_pretrained.py      # trains only the head (~15 s)
+python scripts/detect.py data/raw_svanstrom/Audio/DRONE_001.wav
+python -m pytest tests -q               # 36 tests
 ```
 
 In VS Code, press ⇧⌘P → "Python: Select Interpreter" → pick the one inside
 `.venv`, so the editor and the terminal agree.
 
-The raw corpus is not committed. Fetch it with:
-
-```bash
-cd data
-git clone --depth 1 https://github.com/saraalemadi/DroneAudioDataset.git raw_droneaudio
-rm -rf raw_droneaudio/.git
-curl -o esc50_meta.csv https://raw.githubusercontent.com/karolpiczak/ESC-50/master/meta/esc50.csv
-cd ..
-```
+The raw corpora and the pretrained checkpoint are not committed. Fetch
+everything (~985 MB) with `python scripts/download_data.py`; see
+`data/README.md` for provenance.
 
 ## What the data is
 
@@ -110,11 +107,34 @@ likely reflects indoor-vs-ESC-50 recording differences than real
 discrimination. Tier 3 (outdoor, different hardware) is the test that
 decides.
 
+## Pretrained detector (step 3)
+
+No model is trained from scratch. A frozen PANNs MobileNetV1 (AudioSet,
+4.2 M parameters, 24 MB) turns each loudness-normalised 1 s clip into a
+1024-d embedding, and a logistic-regression head is fitted on top in
+seconds. Same tiers, same 1%-FPR operating point as the baseline:
+
+| split | baseline (best) PR-AUC / recall | pretrained PR-AUC / recall |
+|---|---|---|
+| tier 1 (held-out recordings) | 0.981 / 0.935 | 0.968 / 0.878 |
+| tier 2 (unseen drone model) | 0.891 / 0.393 | **0.929 / 0.647** |
+| tier 3 (outdoor corpus, 1 s windows) | 0.735 / 0.073 | 0.649 / 0.330 |
+
+The pretrained features are what carry over to a drone the head never
+heard: recall on Mambo goes from 39% to 65%. Outdoors both models are weak;
+the baseline's threshold does not transfer at all (7% recall), the
+pretrained one keeps 33% at a 3% false-alarm rate. Per 10 s recording, with
+`detect.py`'s rule (two consecutive positive windows), it detects 15 / 30
+outdoor drones with 2 / 30 helicopter and 0 / 30 background false alarms,
+having never heard outdoor audio. Closing that gap is what augmentation
+(step 4) is for. The embedding layer and C came from a small grid, so the
+pretrained rows are mildly optimistic.
+
 ## Splits
 
 - **tier 1** — held-out recordings, same corpus. The everyday split (70/15/15 by group).
 - **tier 2** — held-out drone *model*: train on Bebop, test on Mambo. Answers "does it detect drones, or only the drones it saw?"
-- **tier 3** — held-out *corpus*. Column exists; needs a second dataset to fill.
+- **tier 3** — held-out *corpus*: train on all indoor recordings, test on the 90 outdoor Svanström recordings (drone / helicopter / background), cut into 1 s windows grouped by recording. The threshold comes from indoor validation; the outdoor set is never used for training or tuning.
 
 ## Layout
 
@@ -125,15 +145,23 @@ src/dronedet/
   data/manifest.py      build + validate the manifest
   features/audio.py     load, fix length, log-mel
   models/baseline.py    level-invariant summary features + sklearn models
+  models/pretrained.py  frozen PANNs MobileNetV1 encoder (no torchlibrosa)
   eval/metrics.py       threshold at FPR, grouped bootstrap, per-category FA
+  eval/protocol.py      tier 1 / 2 / 3 protocol shared by every model
+scripts/download_data.py
 scripts/build_manifest.py
 scripts/make_features.py
 scripts/train_baseline.py
+scripts/make_embeddings.py
+scripts/train_pretrained.py
+scripts/detect.py             run the detector on any audio file
 reports/baseline_audio.{md,json}
-tests/test_manifest.py        11 tests, incl. an injected-leak check
-tests/test_audio_features.py  11 tests, incl. cache-reproduces-from-code
+reports/pretrained_audio.{md,json}
+tests/test_manifest.py        13 tests, incl. an injected-leak check
+tests/test_audio_features.py  12 tests, incl. cache-reproduces-from-code
 tests/test_baseline.py        5 tests, incl. level invariance
-data/                   gitignored — raw corpus, manifest, feature cache
+tests/test_pretrained.py      6 tests, incl. level invariance of embeddings
+data/                   gitignored — raw corpora, checkpoint, manifest, caches
 ```
 
 `tests/test_manifest.py::test_validate_catches_injected_leak` deliberately
