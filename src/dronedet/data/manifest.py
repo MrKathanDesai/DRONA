@@ -5,6 +5,7 @@ import hashlib
 import re
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import soundfile as sf
 
@@ -87,6 +88,7 @@ def build(root: Path, esc_csv: Path, source: str = "droneaudio",
                 path=p.relative_to(data_dir).as_posix(), label=label, group_id=group, source=source,
                 drone_model=model, bg_category=cat,
                 sample_rate=info.samplerate, duration=round(info.duration, 4),
+                start_s=np.nan,   # whole clip
             ))
     df = pd.DataFrame(rows)
 
@@ -97,8 +99,45 @@ def build(root: Path, esc_csv: Path, source: str = "droneaudio",
     df["split_tier1"] = df.group_id.map(assign_tier1)
     df["split_tier2"] = df.apply(assign_tier2, axis=1)
     df.loc[df.exclude_reason != "", ["split_tier1", "split_tier2"]] = "excluded"
-    df["split_tier3"] = "unavailable"
+    df["split_tier3"] = np.where(df.split_tier1 == "val", "val", "train")
+    df.loc[df.exclude_reason != "", "split_tier3"] = "excluded"
     return df
+
+
+SVAN_LABELS = {"DRONE": ("drone", None),
+               "HELICOPTER": ("background", "helicopter"),
+               "BACKGROUND": ("background", "outdoor_background")}
+
+
+def build_svanstrom(root: Path, window_s: float = 1.0,
+                    data_dir: Path = DATA_DIR) -> pd.DataFrame:
+    """Outdoor corpus (Svanstrom et al. 2021), test-only for tier 3.
+
+    Each 10 s recording becomes non-overlapping 1 s windows, one row per
+    window (`start_s`). All windows of a recording share its group_id. The
+    drone type is not given per file, so drone_model stays empty.
+    """
+    rows = []
+    for p in sorted(root.glob("*.wav")):
+        kind = p.stem.rsplit("_", 1)[0]
+        label, cat = SVAN_LABELS[kind]
+        info = sf.info(str(p))
+        for k in range(int(info.duration // window_s)):
+            rows.append(dict(
+                path=p.relative_to(data_dir).as_posix(), label=label,
+                group_id="svan_" + p.stem, source="svanstrom",
+                drone_model=None, bg_category=cat,
+                sample_rate=info.samplerate, duration=window_s,
+                start_s=k * window_s,
+            ))
+    df = pd.DataFrame(rows)
+    df["exclude_reason"] = ""
+    df["split_tier1"] = df["split_tier2"] = "excluded"
+    df["split_tier3"] = "test"
+    return df
+
+
+TIERS = ("split_tier1", "split_tier2", "split_tier3")
 
 
 class LeakageError(AssertionError):
@@ -108,7 +147,7 @@ class LeakageError(AssertionError):
 def validate(df: pd.DataFrame) -> dict:
     problems = []
 
-    for tier in ("split_tier1", "split_tier2"):
+    for tier in TIERS:
         overlap = (df[df[tier] != "excluded"]
                      .groupby("group_id")[tier]
                      .nunique()
@@ -123,10 +162,11 @@ def validate(df: pd.DataFrame) -> dict:
         problems.append(f"{int(absolute.sum())} absolute path(s); "
                         "paths must be relative to the data directory")
 
-    if df.path.duplicated().any():
-        problems.append(f"{int(df.path.duplicated().sum())} duplicate paths")
+    dup = df.duplicated(["path", "start_s"])
+    if dup.any():
+        problems.append(f"{int(dup.sum())} duplicate (path, start_s) rows")
 
-    for tier in ("split_tier1", "split_tier2"):
+    for tier in TIERS:
         for sp in df[tier].unique():
             sub = df[df[tier] == sp]
             if sp != "excluded" and sub.label.nunique() < 2:

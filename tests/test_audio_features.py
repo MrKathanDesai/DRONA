@@ -74,6 +74,14 @@ def test_resampling_preserves_pitch(tmp_path):
     assert from_44k.mean(axis=1).argmax() == native.mean(axis=1).argmax()
 
 
+def test_window_offset_selects_the_right_second(tmp_path):
+    """start_s=0 must mean the first second, not a centre crop."""
+    y = np.concatenate([tone(500, 1.0), tone(2000, 1.0), tone(4000, 1.0)])
+    sf.write(tmp_path / "three.wav", y, 16000)
+    peak = lambda **kw: A.clip_features(tmp_path / "three.wav", **kw).mean(axis=1).argmax()
+    assert peak(start_s=0.0) < peak() < peak(start_s=2.0)
+
+
 def test_features_are_deterministic():
     y = tone(300, 1.0)
     assert np.array_equal(A.log_mel(y), A.log_mel(y))
@@ -97,7 +105,8 @@ def test_cache_matches_current_manifest():
     assert meta["manifest_hash"] == make_features.manifest_hash(df), \
         "manifest changed since features were cached"
     idx = pd.read_parquet(FEATS / "index.parquet")
-    assert list(idx.path) == list(df.path)
+    key = lambda d: list(zip(d.path, d.start_s.fillna(-1)))
+    assert key(idx) == key(df)
 
 
 @needs_cache
@@ -109,7 +118,7 @@ def test_cache_reproduces_from_code():
     rows = set(idx.groupby(idx.duration.round(3)).head(1).index)
     rows |= set(np.random.default_rng(0).choice(len(idx), 20, replace=False))
     for i in sorted(rows):
-        again = A.clip_features(resolve(idx.path[i]))
+        again = A.clip_features(resolve(idx.path[i]), start_s=idx.start_s[i])
         np.testing.assert_allclose(again, X[i], atol=1e-4,
                                    err_msg=idx.path[i])
 

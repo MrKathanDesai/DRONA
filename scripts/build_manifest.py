@@ -12,6 +12,7 @@ from dronedet.data import manifest as M
 from dronedet.paths import DATA_DIR
 
 RAW = DATA_DIR / "raw_droneaudio" / "Binary_Drone_Audio"
+SVAN = DATA_DIR / "raw_svanstrom" / "Audio"
 ESC = DATA_DIR / "esc50_meta.csv"
 OUT = DATA_DIR / "manifest.parquet"
 
@@ -19,6 +20,10 @@ OUT = DATA_DIR / "manifest.parquet"
 def main() -> int:
     print("scanning audio (reads a header per file, takes a moment)...")
     df = M.build(RAW, ESC)
+    if SVAN.exists():
+        df = pd.concat([df, M.build_svanstrom(SVAN)], ignore_index=True)
+    else:
+        print(f"  {SVAN} missing: tier 3 will have no test set")
     stats = M.validate(df)
 
     df.to_parquet(OUT, index=False)
@@ -57,7 +62,7 @@ def main() -> int:
           f"{int(df.group_id.str.startswith('synth_').sum())} "
           f"(silence / noise / taps — no ESC-50 category)")
 
-    for tier in ("split_tier1", "split_tier2"):
+    for tier in M.TIERS:
         print(f"\n  {tier}:")
         t = (df.groupby([tier, "label"]).size().unstack(fill_value=0))
         for sp in t.index:

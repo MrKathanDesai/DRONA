@@ -35,8 +35,8 @@ def manifest_hash(df: pd.DataFrame) -> str:
     ).hexdigest()[:12]
 
 
-def _one(rel_path: str) -> np.ndarray:
-    return A.clip_features(resolve(rel_path), A.DEFAULT)
+def _one(rel_path: str, start_s: float | None) -> np.ndarray:
+    return A.clip_features(resolve(rel_path), A.DEFAULT, start_s)
 
 
 def main() -> int:
@@ -54,7 +54,7 @@ def main() -> int:
 
     print(f"  {len(df)} clips -> ({cfg.n_mels}, {cfg.n_frames}) log-mel ...")
     with ProcessPoolExecutor() as pool:
-        feats = list(pool.map(_one, df.path, chunksize=64))
+        feats = list(pool.map(_one, df.path, df.start_s, chunksize=64))
     X = np.stack(feats).astype(np.float32)
 
     np.save(OUT / "X.npy", X)

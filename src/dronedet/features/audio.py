@@ -75,9 +75,21 @@ def log_mel(y: np.ndarray, cfg: LogMelConfig = DEFAULT) -> np.ndarray:
     return (10.0 * np.log10(S + 1e-10)).astype(np.float32)
 
 
-def clip_features(path: str | Path, cfg: LogMelConfig = DEFAULT) -> np.ndarray:
+def load_clip(path: str | Path, start_s: float | None = None,
+              cfg: LogMelConfig = DEFAULT) -> np.ndarray:
+    """One fixed-length mono clip at cfg.sample_rate. `start_s` selects a
+    window inside a long recording; None (NaN in the manifest) takes the
+    whole clip and centre-crops it."""
     y = load_mono(path, cfg.sample_rate)
-    return log_mel(fix_length(y, cfg.clip_samples), cfg)
+    if start_s is not None and not np.isnan(start_s):
+        a = int(round(start_s * cfg.sample_rate))
+        y = y[a:a + cfg.clip_samples]
+    return fix_length(y, cfg.clip_samples)
+
+
+def clip_features(path: str | Path, cfg: LogMelConfig = DEFAULT,
+                  start_s: float | None = None) -> np.ndarray:
+    return log_mel(load_clip(path, start_s, cfg), cfg)
 
 
 def standardize(X: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:

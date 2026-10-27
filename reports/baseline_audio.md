@@ -6,10 +6,12 @@ Level-invariant log-mel summary statistics (per-band shape, spread, flux; 384 di
 |---|---|---|---|---|---|
 | logreg | tier 1 | 0.966 [0.933, 0.986] | 0.993 | 0.833 | 0.0028 (5/1759) |
 | logreg | tier 2 | 0.884 [0.844, 0.917] | 0.950 | 0.536 | 0.0133 (28/2113) |
+| logreg | tier 3 | 0.735 [0.606, 0.840] | 0.840 | 0.073 | 0.0000 (0/600) |
 | hgb | tier 1 | 0.981 [0.954, 0.998] | 0.994 | 0.935 | 0.0017 (3/1759) |
 | hgb | tier 2 | 0.891 [0.845, 0.927] | 0.961 | 0.393 | 0.0066 (14/2113) |
+| hgb | tier 3 | 0.702 [0.562, 0.820] | 0.812 | 0.197 | 0.0117 (7/600) |
 
-Test prevalence: tier 1 0.122, tier 2 0.240 (PR-AUC of a random classifier equals the prevalence).
+Test prevalence: tier 1 0.122, tier 2 0.240, tier 3 0.333 (PR-AUC of a random classifier equals the prevalence).
 
 ## Shortcut probes (separability of a nuisance variable alone, tier 1 test; 0.5 = useless, 1.0 = gives the label away)
 
@@ -43,3 +45,10 @@ Worst 10 overall:
 | breathing | 0.000 | 0 | 50 |
 | crow | 0.000 | 0 | 50 |
 | brushing_teeth | 0.000 | 0 | 45 |
+
+## Tier 3 (outdoor) false alarms by category (hgb)
+
+| category | FA rate | false alarms | clips |
+|---|---|---|---|
+| helicopter | 0.013 | 4 | 300 |
+| outdoor_background | 0.010 | 3 | 300 |
