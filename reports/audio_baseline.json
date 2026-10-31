@@ -1,0 +1,134 @@
+{
+  "project": "DRONA audio-only classical baseline",
+  "model": {
+    "name": "RandomForestClassifier",
+    "n_estimators": 300,
+    "class_weight": "balanced_subsample",
+    "random_state": 42,
+    "input_features": "64-bin log-mel spectrogram temporal means followed by 64 temporal standard deviations",
+    "feature_dimensions": 128,
+    "sample_rate_hz": 16000,
+    "n_fft": 512,
+    "hop_length": 160
+  },
+  "split_policy": "Existing manifest Tier 1 group-based train/val/test split; threshold selected on validation only",
+  "counts": {
+    "usable_clips": 11702,
+    "excluded_manifest_clips": 2,
+    "clips_by_split": {
+      "train": {
+        "background": 7166,
+        "drone": 900
+      },
+      "val": {
+        "background": 1445,
+        "drone": 187
+      },
+      "test": {
+        "background": 1759,
+        "drone": 245
+      }
+    },
+    "groups_by_split": {
+      "train": 1578,
+      "val": 336,
+      "test": 401
+    }
+  },
+  "validation": {
+    "threshold_maximizing_f1": 0.36666666666666664,
+    "f1_at_threshold": 0.8547945205479452
+  },
+  "test": {
+    "threshold_0_5": {
+      "threshold": 0.5,
+      "precision": 0.9537037037037037,
+      "recall": 0.8408163265306122,
+      "f1": 0.8937093275488069,
+      "pr_auc": 0.9535205557267453,
+      "roc_auc": 0.9864138947221868,
+      "confusion_matrix": [
+        [
+          1749,
+          10
+        ],
+        [
+          39,
+          206
+        ]
+      ],
+      "classification_report": {
+        "background": {
+          "precision": 0.9781879194630873,
+          "recall": 0.9943149516770893,
+          "f1-score": 0.9861855088807443,
+          "support": 1759.0
+        },
+        "drone": {
+          "precision": 0.9537037037037037,
+          "recall": 0.8408163265306122,
+          "f1-score": 0.8937093275488069,
+          "support": 245.0
+        },
+        "accuracy": 0.9755489021956087,
+        "macro avg": {
+          "precision": 0.9659458115833954,
+          "recall": 0.9175656391038507,
+          "f1-score": 0.9399474182147756,
+          "support": 2004.0
+        },
+        "weighted avg": {
+          "precision": 0.9751945896921047,
+          "recall": 0.9755489021956087,
+          "f1-score": 0.9748797881091251,
+          "support": 2004.0
+        }
+      }
+    },
+    "validation_tuned_threshold": {
+      "threshold": 0.36666666666666664,
+      "precision": 0.9234042553191489,
+      "recall": 0.8857142857142857,
+      "f1": 0.9041666666666667,
+      "pr_auc": 0.9535205557267453,
+      "roc_auc": 0.9864138947221868,
+      "confusion_matrix": [
+        [
+          1741,
+          18
+        ],
+        [
+          28,
+          217
+        ]
+      ],
+      "classification_report": {
+        "background": {
+          "precision": 0.9841718485019785,
+          "recall": 0.9897669130187606,
+          "f1-score": 0.9869614512471655,
+          "support": 1759.0
+        },
+        "drone": {
+          "precision": 0.9234042553191489,
+          "recall": 0.8857142857142857,
+          "f1-score": 0.9041666666666667,
+          "support": 245.0
+        },
+        "accuracy": 0.9770459081836327,
+        "macro avg": {
+          "precision": 0.9537880519105637,
+          "recall": 0.9377405993665231,
+          "f1-score": 0.9455640589569161,
+          "support": 2004.0
+        },
+        "weighted avg": {
+          "precision": 0.9767426766807245,
+          "recall": 0.9770459081836327,
+          "f1-score": 0.9768393343698091,
+          "support": 2004.0
+        }
+      }
+    }
+  }
+}
