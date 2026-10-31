@@ -7,12 +7,33 @@ Acoustic drone detection — a dataset-only project. No hardware required.
 | Step | What | State |
 |---|---|---|
 | 1 | Data foundation: manifest, splits, leakage tests | **done** |
-| 2 | Features + classical baseline | next |
-| 3 | CNN detector, tiered evaluation | |
-| 4 | Augmentation, SNR + distance curves | |
+| 2 | Log-mel features + classical audio baseline | **done** |
+| 3 | CNN detector, tiered evaluation | **done** |
+| 4 | Initial synthetic-noise SNR evaluation | **done** |
 | 5 | Calibration (temperature scaling, ECE) | |
 | 6 | Open-set head | |
-| 7 | Tracking / fusion layer (classical AI half) | |
+| 7 | RF model and audio/RF fusion | |
+| 8 | Monitoring dashboard and integrated evaluation | |
+
+Step 2 extracts 128 summary features from each usable clip (64 log-mel-bin
+means and standard deviations) and trains a class-balanced Random Forest on
+the existing group-based Tier 1 split. Test metrics use a threshold selected
+on validation data. The implementation and reproducible results are described
+in [PROGRESS.md](./PROGRESS.md); run it with
+`python scripts/train_audio_baseline.py`.
+
+Step 3 trains a compact PyTorch CNN on fixed one-second, 64-bin log-mel
+spectrograms using the same recording-group split. It selects the best epoch
+and probability threshold using validation data, saves metrics and weights
+under `reports/`, and evaluates once on the held-out test set. Run it with
+`python scripts/train_audio_cnn.py`.
+
+The initial noise evaluation adds deterministic white and pink noise at
+20, 10, 5, and 0 dB SNR to the held-out Tier 1 test clips. It keeps both
+models fixed and reuses their clean-validation thresholds. See
+[PROGRESS.md](./PROGRESS.md) and `reports/audio_noise_robustness.json`; run it
+with `python scripts/evaluate_audio_noise.py`. These synthetic tests do not
+replace testing with independent recordings of speech, traffic, wind, or music.
 
 ## Setup
 
