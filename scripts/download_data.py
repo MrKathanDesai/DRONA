@@ -27,6 +27,7 @@ EXPECT = {
     "droneaudio": {"wav": 23408, "drone": 1332, "background": 10372},
     "svanstrom": {"wav": 90},
     "esc50_meta": {"rows": 2001},          # 2000 clips + header
+    "aris": {"drone": 4491, "background": 1000},
 }
 
 
@@ -171,6 +172,48 @@ def get_pretrained(verify_only=False):
     return good
 
 
+# --- 5. ITU ARIS Lab outdoor drones (tier 4 training) -----------------------
+ARIS_URL = ("https://zenodo.org/records/22682339/files/"
+            "itu-aris-lab-acoustic-drone-dataset-v1.0.0.zip?download=1")
+ARIS_MD5 = "64aed06e8dac417d0c3c7db0e3ac340b"
+
+
+def get_aris(verify_only=False):
+    step("5. ITU ARIS Lab acoustic drones  (Muhaciroglu & Akgul, 2026)")
+    dest = DATA / "raw_aris"
+    zpath = dest / "_aris.zip"
+
+    if not (dest / "groups.json").exists():
+        if verify_only:
+            warn("missing")
+            return False
+        dest.mkdir(parents=True, exist_ok=True)
+        print("  downloading 169 MB from Zenodo; it drops connections, resuming...")
+        for _ in range(60):
+            subprocess.run(["curl", "-sSL", "-C", "-", "-m", "300", "-o", str(zpath),
+                            ARIS_URL], check=False)
+            if hashlib.md5(zpath.read_bytes()).hexdigest() == ARIS_MD5:
+                break
+        else:
+            warn("gave up, checksum never matched; re-run to resume")
+            return False
+        with zipfile.ZipFile(zpath) as z:
+            z.extractall(dest)
+        inner = next(dest.glob("itu-aris-*"))
+        for item in inner.iterdir():
+            item.rename(dest / item.name)
+        inner.rmdir()
+        zpath.unlink()
+
+    n_drone = len(list((dest / "audio" / "drone").glob("*.wav")))
+    n_bg = len(list((dest / "audio" / "background").glob("*.wav")))
+    good = (n_drone, n_bg) == (EXPECT["aris"]["drone"], EXPECT["aris"]["background"])
+    (ok if good else warn)(f"{n_drone} drone + {n_bg} background segments")
+    print("     22.05 kHz, 1 s, 50% overlap, recorded OUTDOORS. Split by source")
+    print("     interval only. Training data for tier 4; Svanstrom stays test.")
+    return good
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--verify", action="store_true",
@@ -185,7 +228,8 @@ def main() -> int:
     results = [get_droneaudio(args.verify),
                get_esc50(args.verify),
                get_svanstrom(args.verify),
-               get_pretrained(args.verify)]
+               get_pretrained(args.verify),
+               get_aris(args.verify)]
 
     print("\n" + "=" * 66)
     if all(results):

@@ -1,0 +1,89 @@
+{
+  "target_fpr": 0.01,
+  "models": {
+    "pretrained balanced": {
+      "pr_auc": 0.6395210362403303,
+      "pr_auc_ci95": [
+        0.5033782692858446,
+        0.75497709591767
+      ],
+      "roc_auc": 0.7163055555555555,
+      "prevalence": 0.3333333333333333,
+      "threshold": 0.922091007232666,
+      "recall": 0.22,
+      "fpr": 0.01,
+      "false_alarms": 6,
+      "negatives": 600,
+      "val_recall": 0.5918604651162791,
+      "drone_vs_helicopter_roc": 0.5838555555555555
+    },
+    "pretrained pooled": {
+      "pr_auc": 0.658866045468731,
+      "pr_auc_ci95": [
+        0.5229138238966763,
+        0.7710242527689478
+      ],
+      "roc_auc": 0.7226444444444444,
+      "prevalence": 0.3333333333333333,
+      "threshold": 0.7924504280090332,
+      "recall": 0.24,
+      "fpr": 0.008333333333333333,
+      "false_alarms": 5,
+      "negatives": 600,
+      "val_recall": 0.8511627906976744,
+      "drone_vs_helicopter_roc": 0.6344222222222222
+    },
+    "baseline balanced": {
+      "pr_auc": 0.6194617921765637,
+      "pr_auc_ci95": [
+        0.46808309605964105,
+        0.7384465197518558
+      ],
+      "roc_auc": 0.728138888888889,
+      "prevalence": 0.3333333333333333,
+      "threshold": 0.9367627501487732,
+      "recall": 0.04666666666666667,
+      "fpr": 0.0,
+      "false_alarms": 0,
+      "negatives": 600,
+      "val_recall": 0.40930232558139534,
+      "drone_vs_helicopter_roc": 0.7438222222222222
+    },
+    "baseline pooled": {
+      "pr_auc": 0.6049488032238945,
+      "pr_auc_ci95": [
+        0.4418730706796979,
+        0.7301854913083374
+      ],
+      "roc_auc": 0.7047166666666665,
+      "prevalence": 0.3333333333333333,
+      "threshold": 0.7704553604125977,
+      "recall": 0.07666666666666666,
+      "fpr": 0.0,
+      "false_alarms": 0,
+      "negatives": 600,
+      "val_recall": 0.8209302325581396,
+      "drone_vs_helicopter_roc": 0.725988888888889
+    }
+  },
+  "recording_level": [
+    {
+      "category": "drone",
+      "alarm_rate": 0.4666666666666667,
+      "alarms": 14,
+      "recordings": 30
+    },
+    {
+      "category": "helicopter",
+      "alarm_rate": 0.03333333333333333,
+      "alarms": 1,
+      "recordings": 30
+    },
+    {
+      "category": "outdoor_background",
+      "alarm_rate": 0.0,
+      "alarms": 0,
+      "recordings": 30
+    }
+  ]
+}

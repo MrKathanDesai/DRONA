@@ -65,8 +65,10 @@ def tier3(F, df, make_model: Callable, target_fpr: float):
     return res, fa
 
 
-def fit_deployable(F, df, make_model: Callable, target_fpr: float):
+def fit_deployable(F, df, make_model: Callable, target_fpr: float,
+                   tier: str = "split_tier3"):
     """The model a demo should use: tier-3 training data (all indoor
-    recordings except validation), threshold from validation negatives."""
-    _, _, model, thr = _train_val_test(F, df, "split_tier3", make_model, target_fpr)
+    recordings except validation), threshold from validation negatives.
+    RF has no tier 3 and passes its own tier."""
+    _, _, model, thr = _train_val_test(F, df, tier, make_model, target_fpr)
     return model, thr

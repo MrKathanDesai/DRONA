@@ -63,10 +63,10 @@ def md_table(t: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def recording_level(F, df, model, thr, min_hits=2) -> pd.DataFrame:
-    """Tier-3 decision per 10 s outdoor recording, using detect.py's rule:
+def recording_level(F, df, model, thr, min_hits=2, tier="split_tier3") -> pd.DataFrame:
+    """Decision per 10 s outdoor recording, using detect.py's rule:
     alarm only if `min_hits` consecutive 1 s windows exceed the threshold."""
-    te = (df.split_tier3 == "test").values
+    te = (df[tier] == "test").values
     t = df[te].assign(hit=model.predict_proba(F[te])[:, 1] >= thr)
     rows = []
     for g, r in t.sort_values("start_s").groupby("group_id"):
