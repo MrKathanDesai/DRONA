@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Run the pretrained detector on any audio file.
+"""Run the audio detector on any audio file.
 
     python scripts/detect.py path/to/file.wav
     python scripts/detect.py data/raw_svanstrom/Audio/DRONE_001.wav --hop 0.5
+    python scripts/detect.py file.wav --head tier3      # old indoor-only head
 
-Slides a 1 s window over the file, scores each window with the frozen
-encoder + trained head (scripts/train_pretrained.py), and prints a timeline
-with the encoder's top AudioSet tags as a sanity check of what it hears.
-A drone is reported only when `--min-hits` consecutive windows fire, which
-suppresses one-off false alarms.
+Slides a 1 s window over the file and prints a timeline. By default it uses
+the tier-4 detector (indoor + outdoor training) with uncertainty flags from
+scripts/eval_uncertainty.py, so each window is "drone", "no drone",
+"unknown drone" or "low confidence". The encoder's top AudioSet tags are
+shown as a sanity check of what it hears. A drone is reported only when
+`--min-hits` consecutive windows exceed the threshold, which suppresses
+one-off false alarms (the rule evaluated in the reports).
 """
 from __future__ import annotations
 
@@ -19,27 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-import joblib
-import numpy as np
-from dronedet.features import audio as A
-from dronedet.models import pretrained as PT
-from dronedet.paths import DATA_DIR
-
-HEAD = DATA_DIR / "models" / "pretrained_head.joblib"
-
-
-def windows(y: np.ndarray, sr: int, hop_s: float) -> tuple[list, list]:
-    n, hop = sr, int(hop_s * sr)
-    starts = list(range(0, max(len(y) - n, 0) + 1, hop))
-    return [A.fix_length(y[s:s + n], n) for s in starts], [s / sr for s in starts]
-
-
-def longest_run(flags: np.ndarray) -> int:
-    best = run = 0
-    for f in flags:
-        run = run + 1 if f else 0
-        best = max(best, run)
-    return best
+from dronedet import live as L
+from dronedet.live import longest_run, windows  # noqa: F401  (used by tests)
 
 
 def main() -> int:
@@ -48,31 +32,32 @@ def main() -> int:
     ap.add_argument("--hop", type=float, default=0.5, help="window hop, s")
     ap.add_argument("--min-hits", type=int, default=2,
                     help="consecutive positive windows needed to alarm")
+    ap.add_argument("--head", choices=("detector", "tier4", "tier3"),
+                    default="detector",
+                    help="detector = tier 4 with uncertainty flags (default)")
     args = ap.parse_args()
 
-    if not HEAD.exists():
-        print(f"{HEAD} missing; run scripts/train_pretrained.py first")
+    try:
+        det = L.LiveDetector(args.head)
+    except FileNotFoundError as e:
+        print(e)
         return 1
-    head = joblib.load(HEAD)
-    enc, labels = PT.Encoder(), PT.audioset_labels()
+    y = L.load(args.audio)
+    df, _ = det.analyse(y, args.hop)
 
-    y = A.load_mono(args.audio, A.DEFAULT.sample_rate)
-    clips, starts = windows(y, A.DEFAULT.sample_rate, args.hop)
-    emb, tags = enc(clips)
-    p = head["model"].predict_proba(emb)[:, 1]
-    hit = p >= head["threshold"]
+    print(f"\n  {args.audio}  ({len(y) / L.SR:.1f} s, {len(df)} windows, "
+          f"{det.name}, threshold {det.threshold:.3f})\n")
+    for r in df.itertuples():
+        bar = "#" * int(round(r.p * 20))
+        note = f" ({r.reason})" if r.reason else ""
+        print(f"  {r.t:6.1f}s  {r.p:.3f} {bar:20s} {r.state:15s}{note:30s} {r.tags}")
 
-    print(f"\n  {args.audio}  ({len(y) / A.DEFAULT.sample_rate:.1f} s, "
-          f"{len(clips)} windows, threshold {head['threshold']:.3f})\n")
-    for t, pi, h, tg in zip(starts, p, hit, tags):
-        bar = "#" * int(round(pi * 20))
-        top = ", ".join(labels[i] for i in np.argsort(tg)[::-1][:2])
-        print(f"  {t:6.1f}s  {pi:.3f} {bar:20s} {'DRONE' if h else '     '}  {top}")
-
-    run = longest_run(hit)
+    run = longest_run(df.hit)
     verdict = "DRONE DETECTED" if run >= args.min_hits else "no drone"
-    print(f"\n  {verdict}: {int(hit.sum())}/{len(hit)} windows above threshold, "
-          f"longest run {run} (need {args.min_hits}); max p {p.max():.3f}\n")
+    flagged = int((df.state == "low confidence").sum())
+    print(f"\n  {verdict}: {int(df.hit.sum())}/{len(df)} windows above threshold, "
+          f"longest run {run} (need {args.min_hits}); max p {df.p.max():.3f}; "
+          f"{flagged} windows flagged low confidence\n")
     return 0
 
 
