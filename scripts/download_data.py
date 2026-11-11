@@ -11,6 +11,7 @@ the data came from — treat it as part of the method, not a convenience.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -134,6 +135,42 @@ def get_svanstrom(verify_only=False):
     return good
 
 
+# --- 4. Pretrained encoder (PANNs MobileNetV1, AudioSet) -------------------
+PANNS = {
+    "MobileNetV1_mAP=0.389.pth": (
+        "https://zenodo.org/records/3987831/files/MobileNetV1_mAP=0.389.pth?download=1",
+        "a419303e1c88aa1b9d2ac3811563d371"),
+    "class_labels_indices.csv": (
+        "https://raw.githubusercontent.com/qiuqiangkong/audioset_tagging_cnn/"
+        "master/metadata/class_labels_indices.csv", None),
+}
+
+
+def get_pretrained(verify_only=False):
+    step("4. Pretrained encoder  (Kong et al., PANNs 2020) — 24 MB")
+    dest = DATA / "pretrained"
+    dest.mkdir(parents=True, exist_ok=True)
+    good = True
+    for name, (url, md5) in PANNS.items():
+        path = dest / name
+        if not path.exists():
+            if verify_only:
+                warn(f"{name} missing")
+                good = False
+                continue
+            print(f"  downloading {name} ...")
+            with urllib.request.urlopen(url, timeout=600) as r, \
+                    open(path, "wb") as f:
+                shutil.copyfileobj(r, f)
+        if md5 and hashlib.md5(path.read_bytes()).hexdigest() != md5:
+            warn(f"{name} checksum mismatch; delete it and re-run")
+            good = False
+        else:
+            ok(name)
+    print("     Frozen AudioSet encoder; only a small head is trained on top.")
+    return good
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--verify", action="store_true",
@@ -147,7 +184,8 @@ def main() -> int:
 
     results = [get_droneaudio(args.verify),
                get_esc50(args.verify),
-               get_svanstrom(args.verify)]
+               get_svanstrom(args.verify),
+               get_pretrained(args.verify)]
 
     print("\n" + "=" * 66)
     if all(results):

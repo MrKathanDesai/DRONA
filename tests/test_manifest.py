@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 # pyrefly: ignore [missing-import]
 from dronedet.data import manifest as M
+from dronedet.paths import DATA_DIR
 
 MANIFEST = ROOT / "data" / "manifest.parquet"
 pytestmark = pytest.mark.skipif(
@@ -19,11 +20,17 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def df():
-    return pd.read_parquet(MANIFEST)
+    data = pd.read_parquet(MANIFEST)
+    if "start_s" not in data:
+        data["start_s"] = float("nan")
+        data["path"] = data.path.map(
+            lambda path: Path(path).relative_to(DATA_DIR).as_posix()
+            if Path(path).is_absolute() else path)
+    return data
 
 
 def test_no_group_spans_a_split(df):
-    for tier in ("split_tier1", "split_tier2"):
+    for tier in M.TIERS:
         sub = df[df[tier] != "excluded"]
         spanning = sub.groupby("group_id")[tier].nunique().loc[lambda s: s > 1]
         assert spanning.empty, f"{tier}: {list(spanning.index[:5])}"
@@ -104,5 +111,25 @@ def test_short_clips_are_excluded_not_dropped(df):
     assert (short.split_tier1 == "excluded").all()
 
 
-def test_no_duplicate_paths(df):
-    assert not df.path.duplicated().any()
+def test_no_duplicate_rows(df):
+    assert not df.duplicated(["path", "start_s"]).any()
+
+
+def test_outdoor_corpus_is_test_only(df):
+    svan = df[df.source == "svanstrom"]
+    if svan.empty:
+        pytest.skip("Svanstrom audio not downloaded")
+    assert (svan.split_tier3 == "test").all()
+    assert (svan.split_tier1 == "excluded").all()
+    assert (svan.split_tier2 == "excluded").all()
+    assert (df[df.source != "svanstrom"].split_tier3 != "test").all()
+
+
+def test_outdoor_windows_group_by_recording(df):
+    svan = df[df.source == "svanstrom"]
+    if svan.empty:
+        pytest.skip("Svanstrom audio not downloaded")
+    assert svan.groupby("path").group_id.nunique().max() == 1
+    assert svan.groupby("group_id").size().min() == 10
+    assert set(svan.label) == {"drone", "background"}
+    assert (svan[svan.label == "background"].bg_category.notna()).all()
