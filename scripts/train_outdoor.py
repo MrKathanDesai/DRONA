@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Tier 4: add outdoor drones to training, test on the untouched Svanstrom set.
+
+    python scripts/train_outdoor.py
+
+ITU ARIS is 82% drone and the indoor corpus 88% background, so pooling them
+makes "sounds outdoors" a drone cue. `balanced` weights each source so drone
+and background count equally within it, and was fixed before testing; `pooled`
+is reported beside it. C stays at the tier-3 value: nothing here is tuned on
+Svanstrom. Writes reports/outdoor_audio.{json,md} and
+data/models/outdoor_head.joblib, leaving the tier-3 head alone.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+from dronedet.eval import metrics as E
+from dronedet.eval import protocol as P
+from dronedet.models import baseline as B
+from dronedet.paths import DATA_DIR
+from train_pretrained import TARGET_FPR, fmt, md_table, recording_level
+
+REPORTS = ROOT / "reports"
+HEAD_OUT = DATA_DIR / "models" / "outdoor_head.joblib"
+TIER = "split_tier4"
+
+
+def source_weights(df: pd.DataFrame) -> np.ndarray:
+    """Every (source, label) cell gets equal total weight."""
+    n = df.groupby(["source", "label"]).label.transform("size").values
+    w = 1.0 / n
+    return w * len(df) / w.sum()
+
+
+def make_head() -> object:
+    return make_pipeline(StandardScaler(),
+                         LogisticRegression(C=0.01, max_iter=5000))
+
+
+def fit_eval(F, df, balanced: bool):
+    tr, va, te = (df[TIER] == s for s in ("train", "val", "test"))
+    if balanced:
+        w = source_weights(df[tr])
+    else:                             # class_weight="balanced", as in tier 3
+        w = np.where(df.y[tr] == 1, 0.5 / df.y[tr].mean(), 0.5 / (1 - df.y[tr].mean()))
+    model = make_head().fit(F[tr], df.y[tr], logisticregression__sample_weight=w)
+    s_va = model.predict_proba(F[va])[:, 1]
+    s_te = model.predict_proba(F[te])[:, 1]
+    thr = E.threshold_at_fpr(s_va[df.y[va].values == 0], TARGET_FPR)
+    res = E.summarize(df.y[te], s_te, df.group_id[te], thr)
+    res["val_recall"] = E.operating_point(df.y[va].values, s_va, thr)["recall"]
+    return res, E.false_alarms_by_category(df[te], s_te, thr), model, thr
+
+
+def drone_vs_helicopter(df, scores) -> float:
+    from sklearn.metrics import roc_auc_score
+    t = df[df[TIER] == "test"].assign(s=scores)
+    t = t[t.category != "outdoor_background"]
+    return float(roc_auc_score(t.y, t.s))
+
+
+def main() -> int:
+    emb = np.load(DATA_DIR / "embeddings" / "E.npy")
+    df = P.with_category(pd.read_parquet(DATA_DIR / "embeddings" / "index.parquet"))
+    idx = pd.read_parquet(DATA_DIR / "features" / "index.parquet")
+    if not idx.path.equals(df.path):
+        raise RuntimeError("feature and embedding caches disagree; rebuild both")
+    feats = B.summary_features(np.load(DATA_DIR / "features" / "X.npy", mmap_mode="r"))
+    print(df.groupby([TIER, "source", "label"]).size().to_string())
+
+    te = (df[TIER] == "test").values
+    runs = {"pretrained balanced": (emb, True), "pretrained pooled": (emb, False),
+            "baseline balanced": (feats, True), "baseline pooled": (feats, False)}
+    report, fas, kept = {"target_fpr": TARGET_FPR, "models": {}}, {}, {}
+    for name, (F, balanced) in runs.items():
+        print(f"  {name} ...", flush=True)
+        res, fas[name], model, thr = fit_eval(F, df, balanced)
+        res["drone_vs_helicopter_roc"] = drone_vs_helicopter(
+            df, model.predict_proba(F[te])[:, 1])
+        report["models"][name] = res
+        kept[name] = (model, thr)
+
+    model, thr = kept["pretrained balanced"]
+    rec = recording_level(emb, df, model, thr, tier=TIER)
+    report["recording_level"] = rec.reset_index().to_dict("records")
+    HEAD_OUT.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump({"model": model, "threshold": thr, "target_fpr": TARGET_FPR},
+                HEAD_OUT)
+
+    before = json.loads((REPORTS / "pretrained_audio.json").read_text())
+    old = before["models"]["logreg"]["tier3_test"]
+    old_rec = pd.DataFrame(before["tier3_recording_level"]).set_index("category")
+
+    (REPORTS / "outdoor_audio.json").write_text(json.dumps(report, indent=2))
+    head = ("| model | PR-AUC [95% CI] | ROC-AUC | recall @ val-1%-FPR "
+            "| test FPR (false alarms) |\n|---|---|---|---|---|")
+    md = [
+        "# Tier 4: outdoor training data, Svanström test", "",
+        "Train on the indoor corpus plus ITU ARIS Lab outdoor drones; test on the "
+        "90 Svanström recordings, which are never used for training or tuning. "
+        f"Threshold fixed at {TARGET_FPR:.0%} FPR on indoor + ITU ARIS validation "
+        "negatives. C unchanged from tier 3. `balanced` was the planned model; "
+        "`pooled` is shown for comparison, not chosen from it. Generated by "
+        "`scripts/train_outdoor.py`.", "",
+        head, "| pretrained, tier 3 (indoor only) " + fmt(old),
+        *[f"| **{n}** " + fmt(r) for n, r in report["models"].items()], "",
+        "Drone vs helicopter ROC-AUC: " + ", ".join(
+            f"{n} {r['drone_vs_helicopter_roc']:.3f}"
+            for n, r in report["models"].items()) + ".", "",
+        "## False alarms by category (pretrained balanced)", "",
+        md_table(fas["pretrained balanced"]), "",
+        "## Per recording (alarm = 2 consecutive positive 1 s windows)", "",
+        "| category | tier 3 alarms | tier 4 alarms | recordings |", "|---|---|---|---|",
+        *[f"| {c} | {int(old_rec.alarms[c])} | {int(r.alarms)} | {int(r.recordings)} |"
+          for c, r in rec.iterrows()], "",
+        f"Saved to `data/models/{HEAD_OUT.name}`, threshold {thr:.4f}. `detect.py` "
+        "uses the tier-4 detector built from it by `eval_uncertainty.py`.", "",
+    ]
+    (REPORTS / "outdoor_audio.md").write_text("\n".join(md))
+    print("\n".join(md))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

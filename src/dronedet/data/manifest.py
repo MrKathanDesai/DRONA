@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -101,6 +102,7 @@ def build(root: Path, esc_csv: Path, source: str = "droneaudio",
     df.loc[df.exclude_reason != "", ["split_tier1", "split_tier2"]] = "excluded"
     df["split_tier3"] = np.where(df.split_tier1 == "val", "val", "train")
     df.loc[df.exclude_reason != "", "split_tier3"] = "excluded"
+    df["split_tier4"] = df["split_tier3"]
     return df
 
 
@@ -133,11 +135,40 @@ def build_svanstrom(root: Path, window_s: float = 1.0,
     df = pd.DataFrame(rows)
     df["exclude_reason"] = ""
     df["split_tier1"] = df["split_tier2"] = "excluded"
-    df["split_tier3"] = "test"
+    df["split_tier3"] = df["split_tier4"] = "test"
     return df
 
 
-TIERS = ("split_tier1", "split_tier2", "split_tier3")
+def build_aris(root: Path, data_dir: Path = DATA_DIR) -> pd.DataFrame:
+    """Outdoor training corpus (ITU ARIS Lab), used by tier 4 only.
+
+    Segments overlap by 50%, so the leakage unit is the dataset's own source
+    interval, and its interval-disjoint split is kept. Its test part joins
+    train: tier 4 is tested on Svanstrom, and so is never tuned on it.
+    """
+    groups = json.loads((root / "groups.json").read_text())["segments"]
+    split = json.loads((root / "splits" / "split_interval_disjoint.json")
+                       .read_text())["assignment"]
+    rows = []
+    for seg in groups:
+        p = root / seg["file"]
+        info = sf.info(str(p))
+        rows.append(dict(
+            path=p.relative_to(data_dir).as_posix(), label=seg["label"],
+            group_id="aris_" + str(seg["group"]), source="itu_aris",
+            drone_model=None,
+            bg_category="aris_background" if seg["label"] == "background" else None,
+            sample_rate=info.samplerate, duration=round(info.duration, 4),
+            start_s=np.nan,
+            split_tier4="val" if split[seg["file"]] == "val" else "train",
+        ))
+    df = pd.DataFrame(rows)
+    df["exclude_reason"] = ""
+    df["split_tier1"] = df["split_tier2"] = df["split_tier3"] = "excluded"
+    return df
+
+
+TIERS = ("split_tier1", "split_tier2", "split_tier3", "split_tier4")
 
 
 class LeakageError(AssertionError):

@@ -94,6 +94,7 @@ python scripts/train_baseline.py       # -> reports/baseline_audio.*   (~2 min)
 python scripts/make_embeddings.py      # -> data/embeddings/     (~25 s on Apple GPU)
 python scripts/train_pretrained.py     # -> reports/pretrained_audio.*, data/models/  (~15 s)
 python scripts/detect.py data/raw_svanstrom/Audio/DRONE_005.wav   # demo
+python scripts/make_figures.py         # -> reports/figures/*.png  (~20 s)
 python -m pytest tests -q              # 36 tests
 ```
 
@@ -807,7 +808,13 @@ level-invariant, and why the encoder input is RMS-normalised.
 | `reports/pretrained_audio.md` / `.json` | `scripts/train_pretrained.py` | Pretrained results vs baseline, tier 3 per recording |
 | `data/models/pretrained_head.joblib` | `scripts/train_pretrained.py` | Trained head + threshold, read by `detect.py` |
 | terminal timeline | `scripts/detect.py` | Per-window scores and verdict for one audio file |
-| `reports/figures/feature_examples.png` | *not made by any committed script* | Example spectrograms from an earlier session; gitignored |
+| `reports/figures/01_spectrograms.png` | `scripts/make_figures.py` | Log-mel spectrograms: indoor Bebop / Mambo / helicopter, outdoor drone / helicopter / background |
+| `reports/figures/02_duration_shortcut.png` | `scripts/make_figures.py` | Clip counts per duration, coloured by class: the duration shortcut |
+| `reports/figures/03_results_by_tier.png` | `scripts/make_figures.py` | Baseline vs pretrained: recall at 1% FPR and PR-AUC with CIs, per tier |
+| `reports/figures/04_outdoor_scores.png` | `scripts/make_figures.py` | Score histograms for outdoor drone / helicopter / background vs the threshold |
+| `reports/figures/05_detection_timeline.png` | `scripts/make_figures.py` | `detect.py` on three outdoor recordings: spectrogram + probability over time |
+| `reports/figures/06_embedding_map.png` | `scripts/make_figures.py` | t-SNE map of the encoder's embeddings, indoor vs outdoor, by class |
+| `reports/figures/feature_examples.png` | *not made by any committed script* | Example spectrograms from an earlier session; superseded by `01_spectrograms.png` |
 | `data/features_legacy/` | an old uncommitted script | Unused; safe to delete (360 MB) |
 
 `data/` is gitignored throughout; everything there can be rebuilt from the
@@ -892,27 +899,36 @@ silently broken.
 | Temporal smoothing (stretch goal) | ✅ Basic: 2 consecutive hits |
 | Runnable demo | ✅ `scripts/detect.py` |
 | CNN vs CNN+LSTM vs transformer comparison | ⚠️ Partial: baseline vs pretrained CNN only |
-| Noise robustness (voice / traffic / wind / music / mixed × low / med / high) | ❌ Next |
-| Drone-model classification + per-class confusion matrices | ❌ |
-| Calibration + uncertainty (entropy / MC-dropout) | ❌ |
-| Open-set "Unknown drone" | ❌ (tier 2 is a ready-made test: Mambo as unknown) |
-| Streamlit dashboard + explainability overlay | ❌ (`detect.py` is the starting point) |
-| Fusion with RF + ablation | ❌ Needs the RF teammate's outputs |
+| Noise robustness (voice / traffic / wind / music / mixed × low / med / high) | ✅ `reports/noise_robustness.md` |
+| Augmentation ablation | ✅ Noise-augmented head vs clean head (head only; encoder frozen) |
+| Drone-model classification + per-class confusion matrices | ⚠️ RF only (`reports/rf_detection.md`) |
+| Uncertainty flag ("low confidence") | ✅ Review band + familiarity, `reports/uncertainty_audio.md` |
+| Probability calibration (temperature scaling, ECE) | ❌ Not done; the flags use ranks, not calibrated probabilities |
+| Open-set "Unknown drone" | ✅ Train Bebop, Mambo flagged at AUROC 0.81 |
+| Streamlit dashboard + explainability overlay | ✅ `app/dashboard.py`, Grad-CAM |
+| Fusion with RF + ablation | ❌ Waits for a second RF corpus |
+
+**What was added after this guide was first written (Nov 2026):**
+
+- `scripts/eval_noise.py`: tier-1 test clips mixed with ESC-50 noise from
+  test-split recordings only, at 20 / 10 / 0 dB; threshold kept from clean
+  validation. A head trained on clean + one noisy copy of each train clip is
+  compared with the clean head and the classical baseline.
+- `scripts/eval_uncertainty.py`: four states per window (drone, no drone,
+  unknown drone, low confidence). All cut-offs from validation and fixed
+  before testing. Saves the tier-4 detector to `data/models/detector.joblib`,
+  which `detect.py` and the dashboard use.
+- `app/dashboard.py`: replays a recording as a live feed; Grad-CAM through
+  the frozen encoder (`src/dronedet/models/explain.py`).
 
 **Next steps, in order:**
 
-1. **Noise augmentation and the robustness table.** Mix outdoor background,
-   wind, speech, traffic and music into training clips at set signal-to-noise
-   ratios (e.g. 20 / 10 / 0 dB), using the same frozen encoder and
-   retraining only the head. This targets the outdoor weakness and produces
-   the proposal's robustness table. Noise sources must be split by group too.
-2. **Calibration and uncertainty.** Temperature scaling, a reliability
-   measure (ECE), and a "low confidence" flag.
-3. **Open-set detection.** Train on Bebop, check that Mambo is flagged as
-   "unknown".
-4. **Streamlit dashboard.** Replay clips as a live feed: status, confidence,
-   AudioSet tags, spectrogram with an explainability overlay.
-5. **Fusion contract with the RF teammate.** Agree on a per-window output
-   such as `{p_drone, class_probs, uncertainty, is_unknown}` in
-   `contracts.py`. Note that the audio and RF datasets were not recorded
-   together, so fusion has to be trained on synthetic pairs matched by class.
+1. **Second RF corpus** (DroneDetect or CardRF, IEEE DataPort login), and a
+   repeat of the quiet-window check. Nothing RF-side is trustworthy before it.
+2. **Outdoor helicopter / aircraft negatives** for audio training.
+3. **Fusion.** Agree on a per-window output such as
+   `{p_drone, state, uncertainty}` in `contracts.py`. The audio and RF
+   datasets were not recorded together, so fusion has to be trained on
+   synthetic pairs matched by class.
+4. **Audio drone-model confusion matrix** (Bebop vs Mambo) if the report
+   needs one; only two indoor models exist.

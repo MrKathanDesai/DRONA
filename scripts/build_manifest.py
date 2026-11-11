@@ -13,6 +13,7 @@ from dronedet.paths import DATA_DIR
 
 RAW = DATA_DIR / "raw_droneaudio" / "Binary_Drone_Audio"
 SVAN = DATA_DIR / "raw_svanstrom" / "Audio"
+ARIS = DATA_DIR / "raw_aris"
 ESC = DATA_DIR / "esc50_meta.csv"
 OUT = DATA_DIR / "manifest.parquet"
 
@@ -24,6 +25,10 @@ def main() -> int:
         df = pd.concat([df, M.build_svanstrom(SVAN)], ignore_index=True)
     else:
         print(f"  {SVAN} missing: tier 3 will have no test set")
+    if (ARIS / "groups.json").exists():
+        df = pd.concat([df, M.build_aris(ARIS)], ignore_index=True)
+    else:
+        print(f"  {ARIS} missing: tier 4 will have no outdoor training data")
     stats = M.validate(df)
 
     df.to_parquet(OUT, index=False)
