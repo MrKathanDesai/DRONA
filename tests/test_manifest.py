@@ -26,6 +26,8 @@ def df():
         data["path"] = data.path.map(
             lambda path: Path(path).relative_to(DATA_DIR).as_posix()
             if Path(path).is_absolute() else path)
+    if "split_tier4" not in data:
+        data["split_tier4"] = data["split_tier3"]
     return data
 
 
