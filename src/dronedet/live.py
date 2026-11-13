@@ -9,6 +9,7 @@ exists; otherwise falls back to a plain head, which gives only "drone" /
 from __future__ import annotations
 
 from pathlib import Path
+from typing import BinaryIO
 
 import joblib
 import numpy as np
@@ -80,5 +81,5 @@ class LiveDetector:
         return X.gradcam(self.enc, clip, self.w, self.b, layer)
 
 
-def load(path: str | Path) -> np.ndarray:
+def load(path: str | Path | BinaryIO) -> np.ndarray:
     return A.load_mono(path, SR)

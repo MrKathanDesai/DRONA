@@ -15,8 +15,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -60,6 +62,21 @@ class RFConfig:
 DEFAULT = RFConfig()
 
 
+def _archive_reader() -> tuple[str, str]:
+    bsdtar = shutil.which("bsdtar")
+    if bsdtar:
+        return "bsdtar", bsdtar
+    seven_zip = shutil.which("7z") or shutil.which("7z.exe")
+    if not seven_zip and Path(r"C:\Program Files\7-Zip\7z.exe").is_file():
+        seven_zip = str(Path(r"C:\Program Files\7-Zip\7z.exe"))
+    if seven_zip:
+        return "7z", seven_zip
+    raise FileNotFoundError(
+        "RF archive processing requires bsdtar or 7-Zip (7z.exe). "
+        "Install an approved archive tool and ensure it is available to this process."
+    )
+
+
 def decode_bui(bui: str) -> dict:
     """'10110' -> drone, ar, flying. Background has no drone or mode."""
     if bui[0] == "0":
@@ -77,7 +94,7 @@ def archive_key(filename: str) -> str:
 
 def parse_member(name: str) -> tuple[str, str, int]:
     """'11000L_3.csv' -> ('11000', 'L', 3)."""
-    m = MEMBER_NAME.match(name.rsplit("/", 1)[-1])
+    m = MEMBER_NAME.match(name.replace("\\", "/").rsplit("/", 1)[-1])
     if not m:
         raise ValueError(f"unexpected member name: {name}")
     return m[1], m[2], int(m[3])
@@ -87,16 +104,39 @@ def iter_archive(path):
     """Yield (member name, samples) without extracting anything to disk.
 
     The CSVs unpack to about 45 GB. Each is a single comma-separated line, so
-    the concatenated stream splits back into members one line at a time.
+    the concatenated stream splits back into members one line at a time. Both
+    bsdtar and 7-Zip stream the archive contents without extracting to disk.
     """
-    names = subprocess.run(["bsdtar", "-tf", str(path)], check=True,
-                           capture_output=True, text=True).stdout.split()
+    reader, executable = _archive_reader()
+    if reader == "bsdtar":
+        names = subprocess.run(
+            [executable, "-tf", str(path)], check=True,
+            capture_output=True, text=True,
+        ).stdout.split()
+        extract_command = [executable, "-xOf", str(path)]
+    else:
+        listing = subprocess.run(
+            [executable, "l", "-slt", str(path)], check=True,
+            capture_output=True, text=True,
+        ).stdout
+        names = [
+            line.removeprefix("Path = ").strip()
+            for line in listing.splitlines()
+            if line.startswith("Path = ")
+        ]
+        extract_command = [executable, "x", "-so", str(path)]
     names = [n for n in names if n.lower().endswith(".csv")]
-    proc = subprocess.Popen(["bsdtar", "-xOf", str(path)],
-                            stdout=subprocess.PIPE)
+    if not names:
+        raise ValueError(f"{path} contains no CSV members")
+    proc = subprocess.Popen(extract_command, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL)
     try:
         for name in names:
             line = proc.stdout.readline()
+            if not line:
+                raise RuntimeError(
+                    f"{reader} returned fewer members than listed in {path}"
+                )
             x = np.fromstring(line.decode("ascii"), sep=",", dtype=np.float32)
             if len(x) != SEGMENT_SAMPLES:
                 raise ValueError(f"{path}:{name} has {len(x)} samples, "
@@ -106,7 +146,7 @@ def iter_archive(path):
         proc.stdout.close()
         code = proc.wait()
     if code:
-        raise RuntimeError(f"bsdtar failed on {path} (exit {code})")
+        raise RuntimeError(f"{reader} failed on {path} (exit {code})")
 
 
 def segment_psd(x: np.ndarray, cfg: RFConfig = DEFAULT):

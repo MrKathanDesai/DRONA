@@ -1,0 +1,259 @@
+{
+  "title": "Svanstr\u00f6m outdoor-confuser training experiment",
+  "seed": 0,
+  "target_fpr": 0.01,
+  "split": "Svanstr\u00f6m background recordings are split 60/20/20 by recording for train/validation/test; every Svanstr\u00f6m drone recording is test-only. Both model variants use the same validation negatives for threshold selection and the same test recordings.",
+  "confuser_recordings_by_split": {
+    "test": {
+      "helicopter": 6,
+      "outdoor_background": 6
+    },
+    "train": {
+      "helicopter": 18,
+      "outdoor_background": 18
+    },
+    "val": {
+      "helicopter": 6,
+      "outdoor_background": 6
+    }
+  },
+  "test_categories": [
+    "drone",
+    "helicopter",
+    "outdoor_background"
+  ],
+  "test_recordings_by_category": {
+    "drone": 30,
+    "helicopter": 6,
+    "outdoor_background": 6
+  },
+  "aircraft_status": "The integrated audio manifest has no explicitly aircraft-labeled outdoor recordings. Existing airplane negatives remain in the training data; outdoor aircraft-specific training is still needed.",
+  "limitations": [
+    "This is a recording-held-out split within Svanstr\u00f6m, not an independent-corpus test.",
+    "Svanstr\u00f6m was used in earlier project evaluation; this split is not a blind external validation.",
+    "Helicopter and outdoor-background negatives are added; the integrated manifest has no explicitly aircraft-labeled outdoor examples.",
+    "This experimental run does not replace or retrain the deployed tier-4 detector."
+  ],
+  "models": {
+    "pretrained_without_svanstrom_negatives": {
+      "pr_auc": 0.8672647654656611,
+      "pr_auc_ci95": [
+        0.7672314108863034,
+        0.9428289319122237
+      ],
+      "roc_auc": 0.6952777777777778,
+      "prevalence": 0.7142857142857143,
+      "threshold": 0.9057983756065369,
+      "recall": 0.25,
+      "fpr": 0.016666666666666666,
+      "false_alarms": 2,
+      "negatives": 120,
+      "val_recall": 0.6267441860465116,
+      "false_alarms_by_category": [
+        {
+          "category": "helicopter",
+          "fa_rate": 0.03333333333333333,
+          "false_alarms": 2,
+          "clips": 60
+        },
+        {
+          "category": "outdoor_background",
+          "fa_rate": 0.0,
+          "false_alarms": 0,
+          "clips": 60
+        }
+      ],
+      "recording_level": [
+        {
+          "category": "drone",
+          "recordings": 30,
+          "alarms": 15,
+          "alarm_rate": 0.5
+        },
+        {
+          "category": "helicopter",
+          "recordings": 6,
+          "alarms": 0,
+          "alarm_rate": 0.0
+        },
+        {
+          "category": "outdoor_background",
+          "recordings": 6,
+          "alarms": 0,
+          "alarm_rate": 0.0
+        }
+      ],
+      "test_windows_by_category": {
+        "drone": 300,
+        "helicopter": 60,
+        "outdoor_background": 60
+      },
+      "test_recording_count": 42
+    },
+    "pretrained_with_svanstrom_negatives": {
+      "pr_auc": 0.9476346386487082,
+      "pr_auc_ci95": [
+        0.9012335249108467,
+        0.9778172507627406
+      ],
+      "roc_auc": 0.8641388888888889,
+      "prevalence": 0.7142857142857143,
+      "threshold": 0.8959293961524963,
+      "recall": 0.21333333333333335,
+      "fpr": 0.0,
+      "false_alarms": 0,
+      "negatives": 120,
+      "val_recall": 0.6162790697674418,
+      "false_alarms_by_category": [
+        {
+          "category": "helicopter",
+          "fa_rate": 0.0,
+          "false_alarms": 0,
+          "clips": 60
+        },
+        {
+          "category": "outdoor_background",
+          "fa_rate": 0.0,
+          "false_alarms": 0,
+          "clips": 60
+        }
+      ],
+      "recording_level": [
+        {
+          "category": "drone",
+          "recordings": 30,
+          "alarms": 14,
+          "alarm_rate": 0.4666666666666667
+        },
+        {
+          "category": "helicopter",
+          "recordings": 6,
+          "alarms": 0,
+          "alarm_rate": 0.0
+        },
+        {
+          "category": "outdoor_background",
+          "recordings": 6,
+          "alarms": 0,
+          "alarm_rate": 0.0
+        }
+      ],
+      "test_windows_by_category": {
+        "drone": 300,
+        "helicopter": 60,
+        "outdoor_background": 60
+      },
+      "test_recording_count": 42
+    },
+    "baseline_without_svanstrom_negatives": {
+      "pr_auc": 0.8586794311519843,
+      "pr_auc_ci95": [
+        0.7403617589307784,
+        0.9456224273177462
+      ],
+      "roc_auc": 0.7197777777777778,
+      "prevalence": 0.7142857142857143,
+      "threshold": 0.9217929840087891,
+      "recall": 0.06333333333333334,
+      "fpr": 0.0,
+      "false_alarms": 0,
+      "negatives": 120,
+      "val_recall": 0.46162790697674416,
+      "false_alarms_by_category": [
+        {
+          "category": "helicopter",
+          "fa_rate": 0.0,
+          "false_alarms": 0,
+          "clips": 60
+        },
+        {
+          "category": "outdoor_background",
+          "fa_rate": 0.0,
+          "false_alarms": 0,
+          "clips": 60
+        }
+      ],
+      "recording_level": [
+        {
+          "category": "drone",
+          "recordings": 30,
+          "alarms": 3,
+          "alarm_rate": 0.1
+        },
+        {
+          "category": "helicopter",
+          "recordings": 6,
+          "alarms": 0,
+          "alarm_rate": 0.0
+        },
+        {
+          "category": "outdoor_background",
+          "recordings": 6,
+          "alarms": 0,
+          "alarm_rate": 0.0
+        }
+      ],
+      "test_windows_by_category": {
+        "drone": 300,
+        "helicopter": 60,
+        "outdoor_background": 60
+      },
+      "test_recording_count": 42
+    },
+    "baseline_with_svanstrom_negatives": {
+      "pr_auc": 0.8841460262656811,
+      "pr_auc_ci95": [
+        0.7806409464230688,
+        0.9550162606307055
+      ],
+      "roc_auc": 0.7566388888888889,
+      "prevalence": 0.7142857142857143,
+      "threshold": 0.9064311385154724,
+      "recall": 0.04,
+      "fpr": 0.0,
+      "false_alarms": 0,
+      "negatives": 120,
+      "val_recall": 0.47674418604651164,
+      "false_alarms_by_category": [
+        {
+          "category": "helicopter",
+          "fa_rate": 0.0,
+          "false_alarms": 0,
+          "clips": 60
+        },
+        {
+          "category": "outdoor_background",
+          "fa_rate": 0.0,
+          "false_alarms": 0,
+          "clips": 60
+        }
+      ],
+      "recording_level": [
+        {
+          "category": "drone",
+          "recordings": 30,
+          "alarms": 1,
+          "alarm_rate": 0.03333333333333333
+        },
+        {
+          "category": "helicopter",
+          "recordings": 6,
+          "alarms": 0,
+          "alarm_rate": 0.0
+        },
+        {
+          "category": "outdoor_background",
+          "recordings": 6,
+          "alarms": 0,
+          "alarm_rate": 0.0
+        }
+      ],
+      "test_windows_by_category": {
+        "drone": 300,
+        "helicopter": 60,
+        "outdoor_background": 60
+      },
+      "test_recording_count": 42
+    }
+  }
+}

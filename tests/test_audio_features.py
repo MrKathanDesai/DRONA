@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import sys
 from pathlib import Path
@@ -72,6 +73,14 @@ def test_resampling_preserves_pitch(tmp_path):
     from_44k = A.clip_features(tmp_path / "a.wav")
     native = A.log_mel(tone(1000, 1.0))
     assert from_44k.mean(axis=1).argmax() == native.mean(axis=1).argmax()
+
+
+def test_load_mono_accepts_in_memory_audio():
+    audio = io.BytesIO()
+    sf.write(audio, tone(1000, 1.0, sr=44100), 44100, format="WAV")
+    loaded = A.load_mono(io.BytesIO(audio.getvalue()), CFG.sample_rate)
+    assert loaded.shape == (CFG.sample_rate,)
+    assert loaded.dtype == np.float32
 
 
 def test_window_offset_selects_the_right_second(tmp_path):

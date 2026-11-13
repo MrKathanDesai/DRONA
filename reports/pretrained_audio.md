@@ -6,28 +6,28 @@ The embedding layer (pooled conv output) and the head's C were chosen from a sma
 
 - tier 1: held-out recordings, same indoor corpus
 - tier 2: train Bebop, test Mambo (unseen drone model)
-- tier 3: train indoor corpus, test outdoor SvanstrÃ¶m corpus (different place, microphone and drones; 30 recordings per class)
+- tier 3: train indoor corpus, test outdoor Svanström corpus (different place, microphone and drones; 30 recordings per class)
 
 | model | split | PR-AUC [95% CI] | ROC-AUC | recall @ val-1%-FPR | test FPR (false alarms) |
 |---|---|---|---|---|---|
 | baseline logreg | tier 1 | 0.966 [0.933, 0.986] | 0.993 | 0.833 | 0.0028 (5/1759) |
 | baseline hgb | tier 1 | 0.981 [0.954, 0.998] | 0.994 | 0.935 | 0.0017 (3/1759) |
 | **pretrained logreg** | tier 1 | 0.968 [0.929, 0.992] | 0.987 | 0.878 | 0.0057 (10/1759) |
-| **pretrained mlp** | tier 1 | 0.968 [0.926, 0.993] | 0.983 | 0.873 | 0.0040 (7/1759) |
+| **pretrained mlp** | tier 1 | 0.968 [0.927, 0.993] | 0.983 | 0.878 | 0.0051 (9/1759) |
 | baseline logreg | tier 2 | 0.884 [0.844, 0.917] | 0.950 | 0.536 | 0.0133 (28/2113) |
 | baseline hgb | tier 2 | 0.891 [0.845, 0.927] | 0.961 | 0.393 | 0.0066 (14/2113) |
-| **pretrained logreg** | tier 2 | 0.929 [0.901, 0.952] | 0.973 | 0.647 | 0.0104 (22/2113) |
-| **pretrained mlp** | tier 2 | 0.922 [0.897, 0.945] | 0.963 | 0.590 | 0.0071 (15/2113) |
+| **pretrained logreg** | tier 2 | 0.929 [0.901, 0.952] | 0.973 | 0.652 | 0.0104 (22/2113) |
+| **pretrained mlp** | tier 2 | 0.922 [0.897, 0.945] | 0.963 | 0.592 | 0.0071 (15/2113) |
 | baseline logreg | tier 3 | 0.735 [0.606, 0.840] | 0.840 | 0.073 | 0.0000 (0/600) |
 | baseline hgb | tier 3 | 0.702 [0.562, 0.820] | 0.812 | 0.197 | 0.0117 (7/600) |
-| **pretrained logreg** | tier 3 | 0.649 [0.514, 0.760] | 0.720 | 0.330 | 0.0317 (19/600) |
-| **pretrained mlp** | tier 3 | 0.637 [0.494, 0.747] | 0.695 | 0.303 | 0.0250 (15/600) |
+| **pretrained logreg** | tier 3 | 0.649 [0.513, 0.760] | 0.719 | 0.330 | 0.0333 (20/600) |
+| **pretrained mlp** | tier 3 | 0.633 [0.489, 0.746] | 0.691 | 0.293 | 0.0217 (13/600) |
 
 ## Tier 3 (outdoor) false alarms by category (logreg)
 
 | category | FA rate | false alarms | clips |
 |---|---|---|---|
-| helicopter | 0.053 | 16 | 300 |
+| helicopter | 0.057 | 17 | 300 |
 | outdoor_background | 0.010 | 3 | 300 |
 
 ## Tier 3 per recording (alarm = 2 consecutive positive 1 s windows)
@@ -40,4 +40,4 @@ The embedding layer (pooled conv output) and the head's C were chosen from a sma
 
 For drones the alarm rate is the detection rate; for the rest it is the false-alarm rate. Same rule as `scripts/detect.py`.
 
-Deployed head: `logreg`, threshold 0.8407, saved to `data/models/pretrained_head.joblib`.
+Deployed head: `logreg`, threshold 0.8396, saved to `data/models/pretrained_head.joblib`.

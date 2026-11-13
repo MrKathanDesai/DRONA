@@ -5,6 +5,7 @@ import json
 from dataclasses import asdict, dataclass
 from math import gcd
 from pathlib import Path
+from typing import BinaryIO
 
 import librosa
 import numpy as np
@@ -38,8 +39,8 @@ class LogMelConfig:
 DEFAULT = LogMelConfig()
 
 
-def load_mono(path: str | Path, sample_rate: int) -> np.ndarray:
-    y, sr = sf.read(str(path), dtype="float32", always_2d=True)
+def load_mono(path: str | Path | BinaryIO, sample_rate: int) -> np.ndarray:
+    y, sr = sf.read(path, dtype="float32", always_2d=True)
     y = y.mean(axis=1)
     if sr != sample_rate:
         g = gcd(sr, sample_rate)
