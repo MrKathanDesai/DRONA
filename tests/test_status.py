@@ -1,8 +1,10 @@
 """Readiness checks, four-state semantics, fusion headline and theme helpers
 (src/dronedet/status.py), plus a headless render of the dashboard."""
 import json
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +16,10 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from dronedet import status as S
 from dronedet.data import rf as R
+
+# The dashboard keeps microphone clips and per-recording results on disk;
+# tests use a throwaway folder so they never touch data/.
+os.environ.setdefault("DRONA_RECORDINGS_DIR", tempfile.mkdtemp(prefix="drona-recordings-"))
 
 
 # --- four states -----------------------------------------------------------
@@ -222,7 +228,8 @@ def test_replay_puts_the_result_first_and_labels_audio_only():
     assert "not calibrated probabilities" in captions
     # The console layout: sensor tiles, coverage map, incidents.
     assert "Acoustic-01" in html and "Radio-01" in html and "Sensor coverage" in html
-    assert "INC-0001" in html
+    analysed = re.search(r">(\d+) analysed<", html)
+    assert analysed and int(analysed.group(1)) >= 1            # the recordings list knows it
     # The console-style top bar's badge shows that recording's final state.
     badge = re.search(r'class="threat"[^>]*>([A-Za-z ]+)</span>', html)
     assert badge and badge.group(1) == shown.group(1)
@@ -269,3 +276,31 @@ def test_theme_choice_survives_reruns(app):
         app.run()                                             # an ordinary rerun
         assert next(r for r in app.sidebar.radio if r.label == "Theme").value == choice
     assert not app.exception
+
+
+@pytest.mark.skipif(not (ROOT / "data" / "models" / "detector.joblib").exists()
+                    or not (ROOT / "data" / "manifest.parquet").exists(),
+                    reason="audio detector or manifest not available")
+def test_analyse_button_in_recordings_list_loads_the_recording():
+    testing = pytest.importorskip("streamlit.testing.v1")
+    at = testing.AppTest.from_file(str(ROOT / "app" / "dashboard.py"), default_timeout=600)
+    at.run()
+    assert [r.label for r in at.main.radio if r.label == "Show"]          # Audio / Radio / Mic
+    next(b for b in at.main.button if b.label == "Analyse").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    html = "\n".join(str(m.value) for m in at.markdown)
+    assert "From the recordings list" in html
+    assert "Recording-level result" in html
+
+
+@pytest.mark.skipif(not (ROOT / "data" / "models" / "rf_detector.joblib").exists(),
+                    reason="RF v2 artifacts not built on this machine")
+def test_use_as_rf_feed_sets_radio_01():
+    testing = pytest.importorskip("streamlit.testing.v1")
+    at = testing.AppTest.from_file(str(ROOT / "app" / "dashboard.py"), default_timeout=600)
+    at.run()
+    next(r for r in at.main.radio if r.label == "Show").set_value("Radio").run()
+    next(b for b in at.main.button if b.label == "Use as RF feed").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    rf = next(s for s in at.main.selectbox if s.label == "Replay recorded RF test windows from")
+    assert rf.value != "None (audio only)"
