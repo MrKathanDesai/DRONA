@@ -55,6 +55,25 @@ def test_recording_verdict(states, min_run, expected):
     assert v.reason
 
 
+def test_alarm_episodes_follow_the_console_rule():
+    no, d, u, low = "no drone", "drone", "unknown drone", "low confidence"
+    # one isolated hit: no incident
+    assert S.alarm_episodes([no, d, no, no], min_run=2) == []
+    # two in a row opens one; a short gap (< hold) keeps it open
+    eps = S.alarm_episodes([d, d, no, d, no, no, no, no], [d, d, no, d, no, no, no, no],
+                           min_run=2, hold=3)
+    assert len(eps) == 1 and (eps[0]["start"], eps[0]["end"]) == (0, 3)
+    assert eps[0]["sources"] == ["acoustic"] and not eps[0]["unknown"]
+    # a long gap closes it; a later run opens a second incident
+    eps = S.alarm_episodes([d, d, no, no, no, u, u], min_run=2, hold=3)
+    assert [(e["start"], e["end"]) for e in eps] == [(0, 1), (5, 6)] and eps[1]["unknown"]
+    # sensors are credited from their own states
+    eps = S.alarm_episodes([d, d], audio_states=[no, no], rf_states=[d, d], min_run=2)
+    assert eps[0]["sources"] == ["radio"]
+    eps = S.alarm_episodes([d, d], audio_states=[low, no], rf_states=[no, no], min_run=2)
+    assert eps[0]["sources"] == ["acoustic", "radio"]       # fused only: both contributed
+
+
 def test_low_confidence_windows_do_not_count_towards_an_alarm():
     v = S.recording_verdict(["low confidence", "drone", "low confidence"], 2)
     assert v.longest_drone_run == 1 and v.state == "low confidence"
@@ -228,8 +247,7 @@ def test_replay_puts_the_result_first_and_labels_audio_only():
     assert "not calibrated probabilities" in captions
     # The console layout: sensor tiles, coverage map, incidents.
     assert "Acoustic-01" in html and "Radio-01" in html and "Sensor coverage" in html
-    analysed = re.search(r">(\d+) analysed<", html)
-    assert analysed and int(analysed.group(1)) >= 1            # the recordings list knows it
+    assert ">Incidents<" in html                                   # third column
     # The console-style top bar's badge shows that recording's final state.
     badge = re.search(r'class="threat"[^>]*>([A-Za-z ]+)</span>', html)
     assert badge and badge.group(1) == shown.group(1)
@@ -285,6 +303,7 @@ def test_analyse_button_in_recordings_list_loads_the_recording():
     testing = pytest.importorskip("streamlit.testing.v1")
     at = testing.AppTest.from_file(str(ROOT / "app" / "dashboard.py"), default_timeout=600)
     at.run()
+    next(r for r in at.main.radio if r.label == "Right panel").set_value("Recordings").run()
     assert [r.label for r in at.main.radio if r.label == "Show"]          # Audio / Radio / Mic
     next(b for b in at.main.button if b.label == "Analyse").click().run()
     assert not at.exception, [e.value for e in at.exception]
@@ -299,8 +318,48 @@ def test_use_as_rf_feed_sets_radio_01():
     testing = pytest.importorskip("streamlit.testing.v1")
     at = testing.AppTest.from_file(str(ROOT / "app" / "dashboard.py"), default_timeout=600)
     at.run()
+    next(r for r in at.main.radio if r.label == "Right panel").set_value("Recordings").run()
     next(r for r in at.main.radio if r.label == "Show").set_value("Radio").run()
     next(b for b in at.main.button if b.label == "Use as RF feed").click().run()
     assert not at.exception, [e.value for e in at.exception]
     rf = next(s for s in at.main.selectbox if s.label == "Replay recorded RF test windows from")
     assert rf.value != "None (audio only)"
+
+
+@pytest.mark.skipif(not (ROOT / "data" / "models" / "detector.joblib").exists()
+                    or not (ROOT / "data" / "manifest.parquet").exists(),
+                    reason="audio detector or manifest not available")
+def test_drone_alarm_is_flagged_played_and_labelled_for_training(tmp_path, monkeypatch):
+    """Kathan's flow: a detected drone becomes an incident in the third column,
+    its seconds of audio can be played, and Confirm drone saves the label that
+    RETRAIN learns from (written to a temporary feedback folder here)."""
+    from dronedet import feedback as FB
+    monkeypatch.setattr(FB, "FEED", tmp_path / "feedback")
+    monkeypatch.setattr(FB, "CLIPS", tmp_path / "feedback" / "clips")
+    monkeypatch.setattr(FB, "LABELS", tmp_path / "feedback" / "labels.csv")
+    monkeypatch.setenv("DRONA_RECORDINGS_DIR", str(tmp_path / "recordings"))
+    testing = pytest.importorskip("streamlit.testing.v1")
+    at = testing.AppTest.from_file(str(ROOT / "app" / "dashboard.py"), default_timeout=600)
+    at.run()
+    next(n for n in at.sidebar.number_input
+         if n.label == "Consecutive drone windows to alarm").set_value(1).run()
+    clip = next(s for s in at.main.selectbox if s.label == "Recording / clip")
+    flagged = False
+    for i in range(1, 8):                       # Svanström drone recordings, until one alarms
+        clip.select_index(i).run()
+        assert not at.exception, [e.value for e in at.exception]
+        if any(b.label == "Confirm drone" for b in at.main.button):
+            flagged = True
+            break
+        clip = next(s for s in at.main.selectbox if s.label == "Recording / clip")
+    if not flagged:
+        pytest.skip("no alarm on the first Svanström drone recordings")
+    html = "\n".join(str(m.value) for m in at.markdown)
+    assert re.search(r'class="id">INC-\d{4}<', html) and "UAS" in html
+    assert len(at.main.get("audio")) >= 1                     # the drone seconds can be played
+    next(b for b in at.main.button if b.label == "Confirm drone").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    labels = FB.load_labels()
+    assert len(labels) == 1 and labels.label.iloc[0] == "drone"
+    html = "\n".join(str(m.value) for m in at.markdown)
+    assert "Confirmed drone" in html
