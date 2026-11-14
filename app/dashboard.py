@@ -268,7 +268,15 @@ def theme_control():
 
 @st.cache_resource(show_spinner="Loading encoder and detector ...")
 def detector() -> L.LiveDetector:
-    return L.LiveDetector("detector")
+    """The audio detector in use: the latest version promoted by RETRAIN
+    (dronedet.feedback, shared with the console), else the original."""
+    from dronedet import feedback as FB
+    det = L.LiveDetector("detector")
+    current = FB.current_model_path()
+    if current != FB.ORIGINAL and current.exists():
+        m = joblib.load(current)
+        det.det, det.model, det.threshold = m, m.head, m.threshold
+    return det
 
 
 @st.cache_resource(show_spinner="Loading prepared RF feature cache ...")
@@ -2219,6 +2227,9 @@ OPS_CSS = """
         padding: 2px 7px; margin-right: 6px; }
 .chip.radio { color: var(--c-radio); border-color: color-mix(in srgb, var(--c-radio) 55%, transparent); }
 .inc .empty { color: var(--dd-faint); font-size: .86rem; }
+.inc.open { border-left: 3px solid var(--c-alert); }
+.chip.ok { color: var(--c-clear); border-color: color-mix(in srgb, var(--c-clear) 55%, transparent); }
+.chip.done { color: var(--dd-faint); }
 .inc { margin: 10px 0 6px; }
 /* Responsive: the three operations columns stack on tablets and phones
    (sensor tiles, then coverage + result, then recordings). */
@@ -2486,6 +2497,227 @@ def render_library(manifest: pd.DataFrame | None, feed):
                           args=(str(path), m["id"], "Microphone"))
 
 
+# ---------------------------------------------------------------------------
+# Incidents (right column), with the operations console's logic: a drone
+# alarm is flagged as an incident, the seconds around it can be played, and
+# an operator confirms it (drone) or rejects it (false alarm). Those labels go
+# to data/feedback (dronedet.feedback, shared with the console) and RETRAIN
+# builds a new detector that replaces the current one only if it passes the
+# held-out benchmark.
+# ---------------------------------------------------------------------------
+def incident_dir() -> Path:
+    d = recordings_dir() / "incidents"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _incident_store() -> dict:
+    s = load_store()
+    s.setdefault("incidents", []); s.setdefault("inc_seq", 0); s.setdefault("sigs", [])
+    return s
+
+
+def record_incidents(sig_key: str, df: pd.DataFrame, sig: np.ndarray, use_rf: bool,
+                     min_hits: int, input_label: str) -> int:
+    """Flag every alarm in this analysis as an incident (once per analysis)."""
+    store = _incident_store()
+    if sig_key in store["sigs"]:
+        return 0
+    eps = S.alarm_episodes(df.shown_state, df.state, df.rf_state if use_rf else None,
+                           min_run=min_hits, hold=3)
+    now = datetime.now(timezone.utc)
+    for ep in eps:
+        store["inc_seq"] += 1
+        iid = f"INC-{store['inc_seq']:04d}"
+        t0 = float(df.t.iloc[ep["start"]])
+        t1 = float(df.t.iloc[ep["end"]]) + 1.0
+        a = max(0.0, t0 - 2.0)                       # 2 s pre-roll, as the console keeps
+        b = min(t1, a + 20.0)                        # at most 20 s of audio
+        sf.write(incident_dir() / f"{iid}.wav", sig[int(a * L.SR):int(b * L.SR)], L.SR)
+        store["incidents"].insert(0, {
+            "id": iid, "file": f"{iid}.wav",
+            "start": (now + pd.Timedelta(seconds=t0)).isoformat(timespec="seconds"),
+            "end": (now + pd.Timedelta(seconds=t1)).isoformat(timespec="seconds"),
+            "seconds": round(t1 - t0, 1), "unknown": ep["unknown"], "sources": ep["sources"],
+            "input": input_label, "reviewed": False, "label": "", "missed": False,
+            "preroll": round(t0 - a, 2)})
+    store["sigs"].append(sig_key)
+    save_store(store)
+    return len(eps)
+
+
+def _inc_duration(seconds: float) -> str:
+    return "Brief" if seconds < 5 else f"{round(seconds)} s" if seconds < 60 else f"{round(seconds / 60)} min"
+
+
+def _inc_status(i: dict) -> tuple[str, str]:
+    if i["label"] == "drone":
+        return ("Reported missed" if i.get("missed") else "Confirmed drone"), "ok"
+    if i["label"] == "not_drone":
+        return "False alarm", "ok"
+    return ("Reviewed", "done") if i["reviewed"] else ("Open", "")
+
+
+def label_incident(iid: str, label: str):
+    """Confirm drone / false alarm: save the clip as a training label."""
+    from dronedet import feedback as FB
+    store = _incident_store()
+    inc = next((x for x in store["incidents"] if x["id"] == iid), None)
+    if inc is None:
+        return
+    try:
+        audio, _ = sf.read(incident_dir() / inc["file"], dtype="float32")
+        if label == "drone" and len(audio) > 3 * L.SR:            # drop the pre-roll
+            audio = audio[int(inc.get("preroll", 0) * L.SR):]
+        FB.save_clip(iid, label, audio, inc["input"])
+    except (OSError, ValueError) as e:
+        st.session_state["inc_msg"] = f"{iid}: not saved ({e})."
+        return
+    inc["label"], inc["reviewed"] = label, True
+    save_store(store)
+    st.session_state["inc_msg"] = (f"{iid} saved as {'drone' if label == 'drone' else 'false alarm'}"
+                                   " for retraining.")
+
+
+def mark_reviewed(iid: str):
+    store = _incident_store()
+    for x in store["incidents"]:
+        if x["id"] == iid:
+            x["reviewed"] = True
+    save_store(store)
+
+
+def review_all():
+    store = _incident_store()
+    for x in store["incidents"]:
+        x["reviewed"] = True
+    save_store(store)
+
+
+def report_missed(key: str, sig: np.ndarray, input_label: str):
+    """The operator heard a drone the detector missed: keep it as a drone label."""
+    from dronedet import feedback as FB
+    store = _incident_store()
+    store["inc_seq"] += 1
+    iid = f"INC-{store['inc_seq']:04d}"
+    seg = sig[: 20 * L.SR]
+    sf.write(incident_dir() / f"{iid}.wav", seg, L.SR)
+    try:
+        FB.save_clip(iid, "drone", seg, input_label)
+    except ValueError as e:
+        st.session_state["inc_msg"] = f"Not saved ({e})."
+        return
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    store["incidents"].insert(0, {"id": iid, "file": f"{iid}.wav", "start": now, "end": now,
+                                  "seconds": round(len(seg) / L.SR, 1), "unknown": False,
+                                  "sources": ["acoustic"], "input": input_label, "reviewed": True,
+                                  "label": "drone", "missed": True, "preroll": 0.0})
+    save_store(store)
+    st.session_state["inc_msg"] = f"{iid} saved as a missed drone for retraining."
+
+
+def incidents_csv(incs: list[dict]) -> bytes:
+    return pd.DataFrame([{
+        "id": i["id"], "start_utc": i["start"], "end_utc": i["end"],
+        "type": "unknown UAS" if i["unknown"] else "UAS", "sources": "+".join(i["sources"]),
+        "input": i["input"], "reviewed": "yes" if i["reviewed"] else "no", "label": i["label"],
+    } for i in incs]).to_csv(index=False).encode("utf-8")
+
+
+def render_incidents():
+    store = _incident_store()
+    incs = store["incidents"]
+    n_open = sum(not i["reviewed"] for i in incs)
+    st.markdown('<div class="ohead2" style="padding-left:2px"><span class="lbl">Incidents</span>'
+                + (f'<span class="lbl" style="margin-left:auto;color:var(--c-alert)">{n_open} open</span>'
+                   if n_open else "") + "</div>", unsafe_allow_html=True)
+    b1, b2 = st.columns(2)
+    b1.button("Review all", key="inc-review-all", on_click=review_all, disabled=not incs,
+              width="stretch")
+    b2.download_button("Export", data=incidents_csv(incs) if incs else b"",
+                       file_name=f"drona-incidents-{datetime.now(timezone.utc):%Y-%m-%d}.csv",
+                       mime="text/csv", key="inc-export", disabled=not incs, width="stretch")
+    if st.session_state.get("inc_msg"):
+        st.caption(st.session_state.pop("inc_msg"))
+    with st.container(height=760, border=False):
+        if not incs:
+            st.markdown('<div class="inc"><div class="empty">No incidents yet. When a drone is '
+                        'detected it is flagged here: play its audio, then confirm it or mark '
+                        'it a false alarm to teach the detector.</div></div>',
+                        unsafe_allow_html=True)
+        for i in incs[:60]:
+            status, cls = _inc_status(i)
+            when = (f"{pd.Timestamp(i['start']).strftime('%H:%M:%S')} UTC · "
+                    f"{_inc_duration(i['seconds'])}")
+            chips = ("".join(f'<span class="chip{" radio" if s == "radio" else ""}">'
+                             f'{"Radio" if s == "radio" else "Acoustic"}</span>' for s in i["sources"])
+                     + f'<span class="chip {cls}">{status}</span>')
+            what = "Unknown UAS" if i["unknown"] else "UAS"
+            st.markdown(f'<div class="inc{" open" if not i["reviewed"] else ""}"><div class="top">'
+                        f'<span class="id">{i["id"]}</span><span class="when">{when}</span></div>'
+                        f'<div class="what">{what}</div><div class="src">{i["input"]}</div>'
+                        f'{chips}</div>', unsafe_allow_html=True)
+            f = incident_dir() / i["file"]
+            if f.is_file():
+                st.audio(str(f), format="audio/wav")
+            if not i["reviewed"]:
+                if f.is_file():
+                    c1, c2 = st.columns(2)
+                    c1.button("Confirm drone", key=f"cd-{i['id']}", on_click=label_incident,
+                              args=(i["id"], "drone"), width="stretch")
+                    c2.button("False alarm", key=f"fa-{i['id']}", on_click=label_incident,
+                              args=(i["id"], "not_drone"), width="stretch")
+                st.button("Mark reviewed", key=f"mr-{i['id']}", on_click=mark_reviewed,
+                          args=(i["id"],), width="stretch")
+
+
+def render_model_tile(rf_ready: bool, fusion_method: str | None):
+    """MODEL tile: version, operator labels, RETRAIN and ROLL BACK (console logic)."""
+    from dronedet import feedback as FB
+    status = FB.status()
+    lab = status["labelled"]
+    rule = {"sum": "Evidence sum (deployed)",
+            "learned": "Learned layer (experimental)"}.get(fusion_method, "Audio only")
+    with st.container(border=True):
+        st.markdown(
+            f'{tile_head("Model", status["version"], "on")}'
+            '<div class="lbl">Operator labels</div>'
+            f'<div class="ostate">{"None yet" if not (lab["drone"] + lab["not_drone"]) else str(lab["drone"]) + " drone · " + str(lab["not_drone"]) + " false"}</div>'
+            f'<div class="lbl">Radio</div><div class="oval">{"RF v2 forest" if rf_ready else "RF v2 · not built"}</div>'
+            f'<div class="lbl">Fusion rule</div><div class="oval">{rule}</div>',
+            unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        do_retrain = c1.button("Retrain", key="model-retrain", type="primary",
+                               disabled=not (lab["drone"] + lab["not_drone"]) or status["new"] == 0,
+                               width="stretch")
+        do_rollback = c2.button("Roll back", key="model-rollback",
+                                disabled=not str(status["version"]).startswith("v")
+                                or str(status["version"]).startswith("v0"), width="stretch")
+        if do_retrain:
+            det = detector()
+            with st.spinner("Retraining on the labelled incidents (a few minutes) ..."):
+                res = FB.retrain(det.enc, det.det)
+            new = res.pop("model", None)
+            if new is not None:
+                det.det, det.model, det.threshold = new, new.head, new.threshold
+                analyse.clear()
+            st.session_state["model_msg"] = (("Promoted " + str(res.get("version")) + ". ")
+                                             if res.get("promoted") else "Not promoted. ") + res.get("reason", "")
+            st.rerun()
+        if do_rollback:
+            FB.rollback()
+            det = detector()
+            m = joblib.load(FB.current_model_path())
+            det.det, det.model, det.threshold = m, m.head, m.threshold
+            analyse.clear()
+            st.session_state["model_msg"] = f"Rolled back to {FB.status()['version']}."
+            st.rerun()
+        st.markdown('<div class="otxt">' + st.session_state.pop(
+            "model_msg", "Label incidents to teach the detector. A retrained model replaces the "
+                         "current one only if it passes the held-out benchmark.") + "</div>",
+                    unsafe_allow_html=True)
+
+
 def sidebar_settings() -> dict:
     """Replay settings stay in the sidebar (the console has no room for them)."""
     st.sidebar.header("Replay settings")
@@ -2530,6 +2762,7 @@ def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = Non
             a_state = st.empty()
             key, audio = recording_choice(manifest, st)
             a_info = st.empty()
+            a_missed = st.empty()
         with st.container(border=True):
             r_head = st.empty()
             r_state = st.empty()
@@ -2537,16 +2770,7 @@ def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = Non
             st.markdown('<div class="otxt">A laptop can\'t receive drone radio; this replays '
                         'recorded 2.4 GHz captures.</div>', unsafe_allow_html=True)
         rf_ready = feed is not None
-        rule = {"sum": "Evidence sum (deployed)",
-                "learned": "Learned layer (experimental)"}.get(fusion_method, "Audio only")
-        st.markdown(
-            f'<div class="ocol"><div class="otile">{tile_head("Model", "deployed", "on")}'
-            '<div class="lbl">Audio</div><div class="oval">Tier-4 pretrained head + uncertainty flags</div>'
-            f'<div class="lbl">Radio</div><div class="oval">{"RF v2 forest" if rf_ready else "RF v2 · not built"}</div>'
-            f'<div class="lbl">Fusion rule</div><div class="oval">{rule}</div>'
-            '<div class="otxt">The dashboard only evaluates; it never retrains. '
-            'Replay settings are in the sidebar.</div></div></div>',
-            unsafe_allow_html=True)
+        render_model_tile(rf_ready, fusion_method)
 
     # ---- analyse (same logic as before) --------------------------------
     use_rf = feed is not None and rf_src != NO_RF
@@ -2583,6 +2807,15 @@ def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = Non
         st.session_state["bar_state"], st.session_state["bar_rf"] = verdict.state, use_rf
         title = Path(key).stem if not key.startswith("upload") else key.split(":")[1]
         remember_result(key, verdict, rf_src if use_rf else None)
+        from dronedet import feedback as FB
+        input_label = f"{clip_source(key)} · {title}"
+        record_incidents(f"{key}|{rf_src if use_rf else ''}|{fusion_method if use_rf else ''}|"
+                         f"{hop}|{min_hits}|{FB.status()['version']}",
+                         df, sig, use_rf, min_hits, input_label)
+        a_missed.button("Report missed drone", key=f"missed-{key}", on_click=report_missed,
+                        args=(key, sig, input_label), width="stretch",
+                        help="Heard a drone the detector did not flag? Saves this clip as a "
+                             "drone label for retraining.")
 
     # fill the tiles now that the states are known
     a_head.markdown(tile_head("Acoustic-01", "Primary", "on" if audio_v else ""),
@@ -2597,7 +2830,12 @@ def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = Non
 
     # ---- right: recordings library ------------------------------------
     with right:
-        render_library(manifest, feed)
+        view = st.radio("Right panel", ["Incidents", "Recordings"], horizontal=True,
+                        key="right_view", label_visibility="collapsed")
+        if view == "Incidents":
+            render_incidents()
+        else:
+            render_library(manifest, feed)
 
     # ---- center: coverage, spectrum, and the full result ----------------
     with center:
