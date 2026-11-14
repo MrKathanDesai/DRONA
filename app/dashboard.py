@@ -50,7 +50,7 @@ FINAL_STATE_LABEL = S.STATE_LABEL
 CHART_REFERENCE = "#8a8f98"
 
 st.set_page_config(page_title="Skyguard · Counter-drone Lab", page_icon="🛰️",
-                   layout="wide")
+                   layout="wide", initial_sidebar_state="collapsed")
 
 # Colour-neutral CSS. Streamlit owns the palette (.streamlit/config.toml has a
 # light and a dark theme; the sidebar Theme control picks System / Light /
@@ -397,7 +397,8 @@ def rf_feed():
 
 def rf_choice(ui=None):
     ui = ui or st.sidebar
-    ui.header("RF feed")
+    if ui is st.sidebar:
+        ui.header("RF feed")
     feed = rf_feed()
     if isinstance(feed, str):
         ui.info("RF replay unavailable: the RF detector or fusion files it needs are "
@@ -1983,11 +1984,10 @@ SOURCE_MIC = "Record with microphone"
 
 def recording_choice(manifest: pd.DataFrame | None, ui=None):
     ui = ui or st.sidebar
-    ui.header("Audio input")
-    ui.caption("The result appears in the **Replay detector** tab.")
-    src = ui.radio(
+    if ui is st.sidebar:
+        ui.header("Audio input")
+    src = ui.selectbox(
         "Source", [*SOURCE_DATASETS, SOURCE_UPLOAD, SOURCE_LINK, SOURCE_MIC],
-        horizontal=True,
         help="Dataset recordings, any audio or video file, a YouTube (or other site) link, "
              "or a recording from this computer's microphone. Video files are used for "
              "their sound only.")
@@ -2120,21 +2120,6 @@ def result_panel(verdict: S.Verdict, basis: str):
     )
 
 
-def sidebar_inputs(manifest: pd.DataFrame | None) -> dict:
-    """Audio input, RF feed and replay settings, all in the sidebar."""
-    key, audio = recording_choice(manifest)
-    feed, rf_src, fusion_method = rf_choice()
-    st.sidebar.header("Replay settings")
-    return dict(
-        key=key, audio=audio, feed=feed, rf_src=rf_src, fusion_method=fusion_method,
-        hop=st.sidebar.select_slider("Window hop (s)", [0.25, 0.5, 1.0], value=0.5),
-        min_hits=int(st.sidebar.number_input("Consecutive drone windows to alarm", 1, 5, 2)),
-        layer_name=st.sidebar.radio("Grad-CAM resolution", list(X.LAYERS)),
-        speed=st.sidebar.select_slider("Replay speed", [1.0, 2.0, 4.0, 8.0], value=2.0,
-                                       format_func=lambda s: f"{s:g}x"),
-    )
-
-
 def gauge(value: float, lo: float, hi: float, threshold: float, color: str) -> str:
     """A bar for `value` on [lo, hi] with a tick at `threshold`."""
     def pos(v):
@@ -2175,188 +2160,423 @@ def state_strip(df: pd.DataFrame, hop: float, use_rf: bool):
     ).properties(height=34 * len(rows) + 30)
 
 
+OPS_CSS = """
+<style>
+/* The console's three-column operations layout (console/static/index.html). */
+.ocol { border: 1px solid var(--dd-line); border-radius: 6px; overflow: hidden; }
+.otile { padding: 16px 18px 18px; border-bottom: 1px solid var(--dd-line); }
+.otile:last-child { border-bottom: 0; }
+.ohead { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
+.oname { font-size: 13px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+         white-space: nowrap; }
+.orole { white-space: nowrap; }
+/* Control labels in the console style. */
+[data-testid="stMain"] [data-testid="stWidgetLabel"] p { font-size: .68rem; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--dd-faint); }
+.orole { margin-left: auto; font-size: 12px; color: var(--dd-faint); }
+.ostate { font-size: 1.55rem; font-weight: 600; line-height: 1.15; margin: 2px 0 12px; }
+.oval { font-size: .9rem; margin: 2px 0 10px; }
+.otxt { font-size: .84rem; line-height: 1.5; color: var(--dd-muted); margin-top: 8px; }
+.ohead2 { display: flex; align-items: center; gap: 10px; padding: 12px 18px;
+          border-bottom: 1px solid var(--dd-line); }
+.omap svg { display: block; width: 100%; height: auto; }
+.onoinput { display: flex; align-items: center; justify-content: center; height: 150px;
+            font-size: 10.5px; font-weight: 600; letter-spacing: .2em; color: var(--dd-faint);
+            background: repeating-linear-gradient(to bottom, transparent 0 49px,
+              var(--dd-line) 49px 50px); }
+.inc { margin: 10px 12px; padding: 14px 16px; border: 1px solid var(--dd-line);
+       border-radius: 6px; background: var(--dd-soft); }
+.inc .top { display: flex; justify-content: space-between; gap: 8px; }
+.inc .id { font-size: 12.5px; font-weight: 700; letter-spacing: .16em; }
+.inc .when { font-size: 11.5px; color: var(--dd-faint); font-variant-numeric: tabular-nums; }
+.inc .what { font-size: 1rem; font-weight: 600; margin: 8px 0 2px; }
+.inc .src { font-size: .84rem; color: var(--dd-faint); margin-bottom: 10px; }
+.chip { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .16em;
+        text-transform: uppercase; border: 1px solid var(--dd-line-2); border-radius: 4px;
+        padding: 2px 7px; margin-right: 6px; }
+.chip.radio { color: var(--c-radio); border-color: color-mix(in srgb, var(--c-radio) 55%, transparent); }
+.inc .empty { color: var(--dd-faint); font-size: .86rem; }
+</style>
+"""
+
+INCIDENT_WHAT = {"drone": "UAS", "unknown drone": "Unknown UAS",
+                 "low confidence": "Possible UAS · review", "no drone": "No drone"}
+
+
+def clip_source(key: str) -> str:
+    """Where the clip came from, in the console's words."""
+    if key.startswith("upload:"):
+        kind = key.rsplit(":", 1)[-1].split("-", 1)[0]
+        return {"file": "File upload", "link": "Video link", "mic": "Microphone"}.get(kind, "File")
+    low = key.lower()
+    for part, name in (("svanstrom", "Svanström outdoor"), ("droneaudio", "DroneAudioDataset"),
+                       ("aris", "ITU ARIS Lab")):
+        if part in low:
+            return name
+    return "Dataset recording"
+
+
+@st.cache_data(show_spinner=False, max_entries=16)
+def spectrum_figure_png(key: str, sig: np.ndarray, sr: int) -> bytes:
+    """The console's 'acoustic spectrum' panel: a spectrogram of the clip."""
+    fig, ax = plt.subplots(figsize=(9, 2.3))
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none")
+    ax.specgram(sig, NFFT=512, Fs=sr, noverlap=384, cmap="magma")
+    ax.set_ylim(0, min(8000, sr / 2))
+    for side in ax.spines.values():
+        side.set_color("#8a8f98")
+    ax.tick_params(colors="#8a8f98", labelsize=7)
+    ax.set_xlabel("time (s)", color="#8a8f98", fontsize=8)
+    ax.set_ylabel("Hz", color="#8a8f98", fontsize=8)
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=110, transparent=True)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def coverage_map(audio_state: str | None, rf_state: str | None, rf_on: bool) -> str:
+    """Site 01 sensor coverage, as in the console: radio zone, acoustic ring,
+    sensor S1. Each zone takes its sensor's colour once it has a result."""
+    a_col = STATE_COLOR.get(audio_state, "currentColor") if audio_state else "currentColor"
+    r_col = (STATE_COLOR.get(rf_state, "#69aed5") if rf_state else "#69aed5") if rf_on else "currentColor"
+    a_op = "0.95" if audio_state else "0.45"
+    r_op = "0.9" if rf_on else "0.35"
+    grid = "".join(f'<line x1="{x}" y1="0" x2="{x}" y2="420" />' for x in range(0, 801, 50))
+    grid += "".join(f'<line x1="0" y1="{y}" x2="800" y2="{y}" />' for y in range(0, 421, 50))
+    return f"""
+<div class="omap"><svg viewBox="0 0 800 420" role="img"
+  aria-label="Site 01 sensor coverage: acoustic ring and radio zone around sensor S1">
+  <g stroke="currentColor" stroke-opacity="0.08" stroke-width="1">{grid}</g>
+  <polygon points="90,75 690,55 765,270 640,385 150,372 70,232" fill="{r_col}"
+    fill-opacity="{'0.06' if rf_on else '0'}" stroke="{r_col}" stroke-opacity="{r_op}"
+    stroke-width="1.5" stroke-dasharray="7 6"/>
+  <circle cx="400" cy="218" r="190" fill="none" stroke="currentColor" stroke-opacity="0.18"
+    stroke-dasharray="3 5"/>
+  <circle cx="400" cy="218" r="115" fill="{a_col}" fill-opacity="{'0.10' if audio_state else '0'}"
+    stroke="{a_col}" stroke-opacity="{a_op}" stroke-width="1.6"/>
+  <g fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25">
+    <rect x="185" y="125" width="95" height="60"/><rect x="292" y="292" width="52" height="42"/>
+    <rect x="540" y="270" width="80" height="66"/></g>
+  <polygon points="400,196 419,207 419,229 400,240 381,229 381,207" fill="none"
+    stroke="currentColor" stroke-width="1.6"/>
+  <circle cx="400" cy="218" r="3.5" fill="currentColor"/>
+  <text x="424" y="266" font-size="18" fill="currentColor" fill-opacity="0.7"
+    letter-spacing="3">S1</text>
+  <text x="400" y="34" text-anchor="middle" font-size="19" font-weight="600"
+    letter-spacing="4" fill="{r_col if rf_on else 'currentColor'}"
+    fill-opacity="{'1' if rf_on else '0.55'}">RADIO</text>
+  <text x="400" y="88" text-anchor="middle" font-size="19" font-weight="600"
+    letter-spacing="4" fill="{a_col}" fill-opacity="{'1' if audio_state else '0.7'}">ACOUSTIC</text>
+  <path d="M735 352 l7 22 l-7 -6 l-7 6 z" fill="currentColor" fill-opacity="0.7"/>
+  <text x="735" y="398" text-anchor="middle" font-size="16" fill="currentColor"
+    fill-opacity="0.6">N</text>
+</svg></div>"""
+
+
+def record_incident(key: str, rf_src: str | None, use_rf: bool, verdict, seconds: float,
+                    source: str):
+    """One incident per analysed clip (and RF choice), newest first."""
+    incidents = st.session_state.setdefault("incidents", [])
+    ident = (key, rf_src if use_rf else None)
+    if any(x["ident"] == ident for x in incidents):
+        return
+    from datetime import datetime, timezone
+    incidents.insert(0, {
+        "ident": ident, "id": f"INC-{len(incidents) + 1:04d}",
+        "time": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
+        "seconds": seconds, "state": verdict.state, "source": source, "rf": use_rf,
+        "title": key.split(":")[1] if key.startswith("upload:") else Path(key).stem,
+    })
+
+
+def incidents_panel() -> tuple[str, list[dict]]:
+    incidents = st.session_state.get("incidents", [])
+    if not incidents:
+        cards = ('<div class="inc"><div class="empty">No incidents yet. Every clip you analyse '
+                 'is listed here, newest first.</div></div>')
+    else:
+        cards = "".join(
+            f'<div class="inc"><div class="top"><span class="id">{x["id"]}</span>'
+            f'<span class="when">{x["time"]} · {x["seconds"]:.0f} s</span></div>'
+            f'<div class="what" style="color:{STATE_COLOR[x["state"]]}">'
+            f'{INCIDENT_WHAT[x["state"]]}</div>'
+            f'<div class="src">{x["source"]} · {x["title"]}</div>'
+            f'<span class="chip">Acoustic</span>'
+            + ('<span class="chip radio">Radio</span>' if x["rf"] else "")
+            + "</div>" for x in incidents)
+    return cards, incidents
+
+
+def sidebar_settings() -> dict:
+    """Replay settings stay in the sidebar (the console has no room for them)."""
+    st.sidebar.header("Replay settings")
+    return dict(
+        hop=st.sidebar.select_slider("Window hop (s)", [0.25, 0.5, 1.0], value=0.5),
+        min_hits=int(st.sidebar.number_input("Consecutive drone windows to alarm", 1, 5, 2)),
+        layer_name=st.sidebar.radio("Grad-CAM resolution", list(X.LAYERS)),
+        speed=st.sidebar.select_slider("Replay speed", [1.0, 2.0, 4.0, 8.0], value=2.0,
+                                       format_func=lambda s: f"{s:g}x"),
+    )
+
+
+def tile_head(name: str, role: str, dot: str = "") -> str:
+    return (f'<div class="ohead"><i class="cdot {dot}"></i><span class="oname">{name}</span>'
+            f'<span class="orole">{role}</span></div>')
+
+
+def tile_state(verdict, idle: str) -> str:
+    if verdict is None:
+        return f'<div class="lbl">State</div><div class="ostate" style="color:var(--dd-faint)">{idle}</div>'
+    return (f'<div class="lbl">State</div><div class="ostate" style="color:{STATE_COLOR[verdict.state]}">'
+            f'{S.STATE_LABEL[verdict.state]}</div>')
+
+
 def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = None):
-    st.subheader("Replay detector")
-    st.caption("Choose the audio in the sidebar. The trained detector runs **automatically** "
-               "as soon as a clip is loaded, and the result appears here. Nothing is retrained: "
-               "the clip is only evaluated. This is an offline replay, not a live sensor feed.")
-    inputs = inputs if inputs is not None else sidebar_inputs(manifest)
+    """The operations page, laid out like the console (console/static/index.html):
+    sensor tiles with their controls on the left, sensor coverage and the
+    acoustic spectrum in the middle with the full result below, incidents on
+    the right. The detection, fusion and input logic is unchanged."""
+    st.markdown(OPS_CSS, unsafe_allow_html=True)
     st.session_state["bar_state"], st.session_state["bar_rf"] = None, False
-    key, audio = inputs["key"], inputs["audio"]
-    feed, rf_src, fusion_method = inputs["feed"], inputs["rf_src"], inputs["fusion_method"]
-    hop, min_hits = inputs["hop"], inputs["min_hits"]
-    layer_name, speed = inputs["layer_name"], inputs["speed"]
-    if audio is None:
-        st.info("Choose the audio in the sidebar → **Audio input**: a dataset recording, any "
-                "audio or video file (MP3, MP4, M4A, WAV, …), a YouTube or other link, or a "
-                "microphone recording. Only the sound is analysed.")
-        return
+    settings = sidebar_settings()
+    hop, min_hits = settings["hop"], settings["min_hits"]
+    layer_name, speed = settings["layer_name"], settings["speed"]
 
-    try:
-        det = detector()
-        df, clips, sig = analyse(key, audio, hop)
-    except FileNotFoundError as e:
-        st.error(f"The audio detector cannot run: {e}. Run `python scripts/eval_uncertainty.py` "
-                 "(and `python scripts/download_data.py` for the encoder weights).")
-        return
-    except Exception as e:                       # unreadable upload, decoder errors
-        st.error(f"Could not analyse this audio ({type(e).__name__}: {e}). Try a WAV file.")
-        return
-    df = df.copy()
-    use_rf = feed is not None and rf_src != NO_RF
-    psd = None
-    if use_rf:
-        psd, a_rf = feed.windows(rf_src, len(df))
-        selected_fusion = feed.fusions[fusion_method]
-        fz, fthr = L.fuse(df, selected_fusion, a_rf["p"],
-                          {k: a_rf[k] for k in L.AUDIO_FLAGS})
-        df = pd.concat([df, fz], axis=1)
-        df["rf_p"] = a_rf["p"]
-        df["rf_state"] = a_rf["state"]
-        df["shown_state"], df["shown_reason"] = df.fused_state, df.fused_reason
-        df["fused_state_label"] = df.fused_state.map(S.state_label)
-    else:
-        df["shown_state"], df["shown_reason"] = df.state, df.reason
-    df["shown_label"] = df.shown_state.map(S.state_label)
-    verdict = S.recording_verdict(df.shown_state, min_hits)
-    st.session_state["bar_state"], st.session_state["bar_rf"] = verdict.state, use_rf
-    title = Path(key).stem if not key.startswith("upload") else key.split(":")[1]
+    left, center, right = st.columns([1.05, 2.45, 1.1], gap="small")
 
-    # 1. The result, first.
-    if use_rf:
-        rule = ("evidence sum (deployed rule)" if fusion_method == "sum"
-                else "learned fusion layer (experimental; misses RF-silent drones)")
-        basis = (f"audio from <em>{title}</em> + recorded RF test windows "
-                 f"(<em>{rf_src}</em>), combined by the {rule}. Unpaired what-if.")
-    else:
-        basis = f"audio only, from <em>{title}</em>. Not a multimodal decision."
-    result_panel(verdict, basis)
-    if use_rf:
-        st.markdown(
-            '<div class="callout"><strong>Not a synchronized multimodal decision.</strong> '
-            "The RF windows are recorded test data of the chosen class, replayed one per audio "
-            "window. They were never recorded with this audio, and no RF receiver is "
-            "connected.</div>", unsafe_allow_html=True)
-
-    # 2. Evidence per sensor, as a visual flow: Audio + RF -> Final.
-    audio_v = S.recording_verdict(df.state, min_hits)
-    audio_tile = decision_tile(
-        "Audio sensor", audio_v,
-        gauge(float(df.p.max()), 0.0, 1.0, det.threshold, STATE_COLOR[audio_v.state]),
-        [f"Highest window score <b>{df.p.max():.2f}</b> · threshold {det.threshold:.2f}",
-         f"{audio_v.drone_windows} of {len(df)} windows drone-like"])
-    if use_rf:
-        rf_v = S.recording_verdict(df.rf_state, min_hits)
-        rf_tile = decision_tile(
-            "RF sensor (recorded replay)", rf_v,
-            gauge(float(df.rf_p.max()), 0.0, 1.0, feed.det.threshold, STATE_COLOR[rf_v.state]),
-            [f"Highest window score <b>{df.rf_p.max():.2f}</b> · threshold "
-             f"{feed.det.threshold:.2f}",
-             f"{rf_v.drone_windows} of {len(df)} windows drone-like"])
-        lo, hi = -10.0, 10.0
-        final_tile = decision_tile(
-            "Final · audio + RF fused", verdict,
-            gauge(float(df.fused.max()), lo, hi, fthr, STATE_COLOR[verdict.state]),
-            [f"Highest fused evidence <b>{df.fused.max():+.1f}</b> · threshold {fthr:+.1f}",
-             f"Rule: {'evidence sum (deployed)' if fusion_method == 'sum' else 'learned layer (experimental)'}"],
-            final=True)
-    else:
-        reason = rf_feed()
-        rf_tile = decision_tile(
-            "RF sensor", None, "", [], off_reason=(
-                "No RF source selected (sidebar → RF feed)." if not isinstance(reason, str)
-                else "RF model files not built on this computer."))
-        final_tile = decision_tile(
-            "Final · audio only", verdict,
-            gauge(float(df.p.max()), 0.0, 1.0, det.threshold, STATE_COLOR[verdict.state]),
-            ["Same as the audio sensor: no RF evidence was used."], final=True)
-    st.markdown(f'<div class="flow">{audio_tile}<div class="op">+</div>{rf_tile}'
-                f'<div class="op">=</div>{final_tile}</div>', unsafe_allow_html=True)
-    st.caption("Bars: the highest window score, with the threshold as a tick. Scores are model "
-               "scores, not calibrated probabilities. A recording alarms after "
-               f"{min_hits} consecutive drone-like windows; isolated hits give Low Confidence.")
-    st.markdown("##### Window by window")
-    st.altair_chart(state_strip(df, hop, use_rf), width="stretch")
-
-    m = st.columns(5)
-    m[0].metric("Windows scored", len(df))
-    m[1].metric("Drone-state windows", verdict.drone_windows)
-    m[2].metric("Longest drone run", f"{verdict.longest_drone_run} (need {min_hits})")
-    m[3].metric("Low-confidence windows", verdict.low_windows)
-    m[4].metric("Unknown-signature windows", verdict.unknown_windows)
-    state_counts = df.shown_label.value_counts()
-    st.caption("Windows per state" + (" (fused)" if use_rf else " (audio)") + ": "
-               + " · ".join(f"{S.STATE_LABEL[s]} {int(state_counts.get(S.STATE_LABEL[s], 0))}"
-                            for s in S.STATES))
-
-    live_slot = st.empty()
-    if st.button("▶ Replay window by window", type="primary",
-                 help="Steps through the windows at the chosen speed."):
-        for i in range(len(df)):
-            r = df.iloc[i]
-            with live_slot.container():
-                c1, c2 = st.columns([1, 3])
-                c1.metric("time", f"{r.t:.1f} s")
-                c1.markdown(f"### {STATE_ICON.get(r.shown_state, '🟡')} {r.shown_label}")
-                c1.caption(r.shown_reason or r.tags)
-                c2.altair_chart(timeline(df, det.threshold, upto=i), width="stretch")
-            time.sleep(hop / speed)
-        live_slot.empty()
-    st.audio(to_wav(sig), format="audio/wav")
-
-    # 3. Single-window drill-down.
-    st.markdown("#### Single-window prediction")
-    st.caption("One 1-second window. A single window is never an alarm on its own; the "
-               "recording-level result above applies the consecutive-window rule.")
-    i = st.slider("Inspect window", 0, len(df) - 1, int(df.p.idxmax()),
-                  format="%d", help="Defaults to the highest-scoring window")
-    st.altair_chart(timeline(df, det.threshold, selected=i), width="stretch")
-    if use_rf:
-        st.caption(f"Audio score above; fused evidence below (RF: {rf_src}). "
-                   "Dashed line = threshold, 1% false alarms on validation data.")
-        st.altair_chart(fused_timeline(df, fthr), width="stretch")
-    r = df.iloc[i]
-    left, right = st.columns([1, 2])
+    # ---- left: sensor tiles with their controls ------------------------
     with left:
-        st.markdown(f"##### {STATE_ICON.get(r.shown_state, '🟡')} {r.shown_label} · "
-                    f"{r.t:.1f}–{r.t + 1:.1f} s")
-        if r.shown_reason:
-            st.caption(f"Flagged: {r.shown_reason}")
+        with st.container(border=True):
+            a_head = st.empty()
+            a_state = st.empty()
+            key, audio = recording_choice(manifest, st)
+            a_info = st.empty()
+        with st.container(border=True):
+            r_head = st.empty()
+            r_state = st.empty()
+            feed, rf_src, fusion_method = rf_choice(st)
+            st.markdown('<div class="otxt">A laptop can\'t receive drone radio; this replays '
+                        'recorded 2.4 GHz captures.</div>', unsafe_allow_html=True)
+        rf_ready = feed is not None
+        rule = {"sum": "Evidence sum (deployed)",
+                "learned": "Learned layer (experimental)"}.get(fusion_method, "Audio only")
+        st.markdown(
+            f'<div class="ocol"><div class="otile">{tile_head("Model", "deployed", "on")}'
+            '<div class="lbl">Audio</div><div class="oval">Tier-4 pretrained head + uncertainty flags</div>'
+            f'<div class="lbl">Radio</div><div class="oval">{"RF v2 forest" if rf_ready else "RF v2 · not built"}</div>'
+            f'<div class="lbl">Fusion rule</div><div class="oval">{rule}</div>'
+            '<div class="otxt">The dashboard only evaluates; it never retrains. '
+            'Replay settings are in the sidebar.</div></div></div>',
+            unsafe_allow_html=True)
+
+    # ---- analyse (same logic as before) --------------------------------
+    use_rf = feed is not None and rf_src != NO_RF
+    df = verdict = audio_v = rf_v = None
+    error = None
+    if audio is not None:
+        try:
+            det = detector()
+            df, clips, sig = analyse(key, audio, hop)
+        except FileNotFoundError as e:
+            error = (f"The audio detector cannot run: {e}. Run `python scripts/eval_uncertainty.py` "
+                     "(and `python scripts/download_data.py` for the encoder weights).")
+        except Exception as e:                       # unreadable upload, decoder errors
+            error = f"Could not analyse this audio ({type(e).__name__}: {e}). Try a WAV file."
+    if df is not None:
+        df = df.copy()
+        psd = None
         if use_rf:
-            st.dataframe(pd.DataFrame({
-                "evidence (log-likelihood ratio, capped)": ["audio", "RF", "fused"],
-                "value": [f"{r.llr_audio:+.2f}", f"{r.llr_rf:+.2f}", f"{r.fused:+.2f}"]}),
-                hide_index=True, width="stretch")
-            st.caption(f"Audio-only state: {S.state_label(r.state)}. "
-                       f"RF score {r.rf_p:.3f} ({S.state_label(r.rf_state)} on RF alone).")
-        st.metric("Audio model score", f"{r.p:.3f}", f"{r.p - det.threshold:+.3f} vs threshold",
-                  delta_color="off")
-        extra = {k: r[k] for k in ("margin", "distance", "spread") if k in r}
-        if extra:
-            st.dataframe(pd.DataFrame({
-                "signal": ["logit margin to threshold", "distance from training data",
-                           "ensemble spread (logit)"][:len(extra)],
-                "value": [f"{v:.2f}" for v in extra.values()]}),
-                hide_index=True, width="stretch")
-        st.markdown("**Encoder hears:** " + r.tags)
-        st.audio(to_wav(clips[i]), format="audio/wav")
+            psd, a_rf = feed.windows(rf_src, len(df))
+            selected_fusion = feed.fusions[fusion_method]
+            fz, fthr = L.fuse(df, selected_fusion, a_rf["p"],
+                              {k: a_rf[k] for k in L.AUDIO_FLAGS})
+            df = pd.concat([df, fz], axis=1)
+            df["rf_p"] = a_rf["p"]
+            df["rf_state"] = a_rf["state"]
+            df["shown_state"], df["shown_reason"] = df.fused_state, df.fused_reason
+            df["fused_state_label"] = df.fused_state.map(S.state_label)
+        else:
+            df["shown_state"], df["shown_reason"] = df.state, df.reason
+        df["shown_label"] = df.shown_state.map(S.state_label)
+        verdict = S.recording_verdict(df.shown_state, min_hits)
+        audio_v = S.recording_verdict(df.state, min_hits)
+        rf_v = S.recording_verdict(df.rf_state, min_hits) if use_rf else None
+        st.session_state["bar_state"], st.session_state["bar_rf"] = verdict.state, use_rf
+        title = Path(key).stem if not key.startswith("upload") else key.split(":")[1]
+        record_incident(key, rf_src, use_rf, verdict, len(sig) / L.SR, clip_source(key))
+
+    # fill the tiles now that the states are known
+    a_head.markdown(tile_head("Acoustic-01", "Primary", "on" if audio_v else ""),
+                    unsafe_allow_html=True)
+    a_state.markdown(tile_state(audio_v, "Offline"), unsafe_allow_html=True)
+    a_info.markdown(
+        f'<div class="otxt">{(title + " · " + str(len(df)) + " windows") if df is not None else "Choose a source above. The detector runs automatically when a clip is loaded."}</div>',
+        unsafe_allow_html=True)
+    r_head.markdown(tile_head("Radio-01", "Recorded replay", "rf" if use_rf else ""),
+                    unsafe_allow_html=True)
+    r_state.markdown(tile_state(rf_v, "Off"), unsafe_allow_html=True)
+
+    # ---- right: incidents ----------------------------------------------
     with right:
-        mel, cam, _ = cam_for(key, i, clips[i], X.LAYERS[layer_name])
-        figure = cam_figure(mel, cam)
-        st.pyplot(figure, width="stretch")
-        plt.close(figure)
-        st.caption("Bright regions pushed the score towards 'drone'. A window scored "
-                   "'no drone' can still show weak evidence.")
+        cards, incidents = incidents_panel()
+        st.markdown(f'<div class="ocol"><div class="ohead2"><span class="lbl">Incidents</span></div>'
+                    f'{cards}</div>', unsafe_allow_html=True)
+        if incidents:
+            st.download_button(
+                "Export", data=pd.DataFrame([{k: v for k, v in x.items() if k != "ident"}
+                                             for x in incidents]).to_csv(index=False).encode(),
+                file_name="incidents.csv", mime="text/csv", key="export-incidents",
+                width="stretch")
+
+    # ---- center: coverage, spectrum, and the full result ----------------
+    with center:
+        st.markdown('<div class="ocol"><div class="ohead2"><span class="lbl">Site 01 · Sensor coverage'
+                    '</span></div>' + coverage_map(audio_v.state if audio_v else None,
+                                                    rf_v.state if rf_v else None, use_rf)
+                    + '</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ohead2" style="padding-left:2px"><span class="lbl">Acoustic spectrum'
+                    '</span></div>', unsafe_allow_html=True)
+        if df is None:
+            st.markdown('<div class="onoinput">NO INPUT</div>', unsafe_allow_html=True)
+            if error:
+                st.error(error)
+            return
+        st.image(spectrum_figure_png(key, sig, L.SR), width="stretch")
+
+        # 1. The result, first.
         if use_rf:
-            rf_fig = rf_figure(psd[i])
-            st.pyplot(rf_fig, width="stretch")
-            plt.close(rf_fig)
-            st.caption("Recorded RF snapshot replayed with this window (25 ms, both halves "
-                       "of the 2.4 GHz band, level removed).")
-    with st.expander("All windows"):
-        st.dataframe(df.drop(columns=["hit", "shown_state", "shown_reason",
-                                      *[c for c in L.AUDIO_FLAGS if c in df]]).round(3),
-                     hide_index=True, width="stretch")
+            rule_txt = ("evidence sum (deployed rule)" if fusion_method == "sum"
+                        else "learned fusion layer (experimental; misses RF-silent drones)")
+            basis = (f"audio from <em>{title}</em> + recorded RF test windows "
+                     f"(<em>{rf_src}</em>), combined by the {rule_txt}. Unpaired what-if.")
+        else:
+            basis = f"audio only, from <em>{title}</em>. Not a multimodal decision."
+        result_panel(verdict, basis)
+        if use_rf:
+            st.markdown(
+                '<div class="callout"><strong>Not a synchronized multimodal decision.</strong> '
+                "The RF windows are recorded test data of the chosen class, replayed one per audio "
+                "window. They were never recorded with this audio, and no RF receiver is "
+                "connected.</div>", unsafe_allow_html=True)
+
+        # 2. Evidence per sensor, as a visual flow: Audio + RF -> Final.
+        audio_tile = decision_tile(
+            "Audio sensor", audio_v,
+            gauge(float(df.p.max()), 0.0, 1.0, det.threshold, STATE_COLOR[audio_v.state]),
+            [f"Highest window score <b>{df.p.max():.2f}</b> · threshold {det.threshold:.2f}",
+             f"{audio_v.drone_windows} of {len(df)} windows drone-like"])
+        if use_rf:
+            rf_tile = decision_tile(
+                "RF sensor (recorded replay)", rf_v,
+                gauge(float(df.rf_p.max()), 0.0, 1.0, feed.det.threshold, STATE_COLOR[rf_v.state]),
+                [f"Highest window score <b>{df.rf_p.max():.2f}</b> · threshold "
+                 f"{feed.det.threshold:.2f}",
+                 f"{rf_v.drone_windows} of {len(df)} windows drone-like"])
+            final_tile = decision_tile(
+                "Final · audio + RF fused", verdict,
+                gauge(float(df.fused.max()), -10.0, 10.0, fthr, STATE_COLOR[verdict.state]),
+                [f"Highest fused evidence <b>{df.fused.max():+.1f}</b> · threshold {fthr:+.1f}",
+                 f"Rule: {'evidence sum (deployed)' if fusion_method == 'sum' else 'learned layer (experimental)'}"],
+                final=True)
+        else:
+            reason = rf_feed()
+            rf_tile = decision_tile(
+                "RF sensor", None, "", [], off_reason=(
+                    "No RF source selected (Radio-01 → feed)." if not isinstance(reason, str)
+                    else "RF model files not built on this computer."))
+            final_tile = decision_tile(
+                "Final · audio only", verdict,
+                gauge(float(df.p.max()), 0.0, 1.0, det.threshold, STATE_COLOR[verdict.state]),
+                ["Same as the audio sensor: no RF evidence was used."], final=True)
+        st.markdown(f'<div class="flow">{audio_tile}<div class="op">+</div>{rf_tile}'
+                    f'<div class="op">=</div>{final_tile}</div>', unsafe_allow_html=True)
+        st.caption("Bars: the highest window score, with the threshold as a tick. Scores are model "
+                   "scores, not calibrated probabilities. A recording alarms after "
+                   f"{min_hits} consecutive drone-like windows; isolated hits give Low Confidence.")
+        st.markdown("##### Window by window")
+        st.altair_chart(state_strip(df, hop, use_rf), width="stretch")
+
+        m = st.columns(5)
+        m[0].metric("Windows", len(df))
+        m[1].metric("Drone-state", verdict.drone_windows)
+        m[2].metric("Longest run", f"{verdict.longest_drone_run}/{min_hits}")
+        m[3].metric("Low conf.", verdict.low_windows)
+        m[4].metric("Unknown", verdict.unknown_windows)
+        state_counts = df.shown_label.value_counts()
+        st.caption("Windows per state" + (" (fused)" if use_rf else " (audio)") + ": "
+                   + " · ".join(f"{S.STATE_LABEL[s]} {int(state_counts.get(S.STATE_LABEL[s], 0))}"
+                                for s in S.STATES))
+
+        live_slot = st.empty()
+        if st.button("▶ Replay window by window", type="primary",
+                     help="Steps through the windows at the chosen speed."):
+            for i in range(len(df)):
+                r = df.iloc[i]
+                with live_slot.container():
+                    c1, c2 = st.columns([1, 3])
+                    c1.metric("time", f"{r.t:.1f} s")
+                    c1.markdown(f"### {STATE_ICON.get(r.shown_state, '🟡')} {r.shown_label}")
+                    c1.caption(r.shown_reason or r.tags)
+                    c2.altair_chart(timeline(df, det.threshold, upto=i), width="stretch")
+                time.sleep(hop / speed)
+            live_slot.empty()
+        st.audio(to_wav(sig), format="audio/wav")
+
+        # 3. Single-window drill-down.
+        st.markdown("#### Single-window prediction")
+        st.caption("One 1-second window. A single window is never an alarm on its own; the "
+                   "recording-level result above applies the consecutive-window rule.")
+        i = st.slider("Inspect window", 0, len(df) - 1, int(df.p.idxmax()),
+                      format="%d", help="Defaults to the highest-scoring window")
+        st.altair_chart(timeline(df, det.threshold, selected=i), width="stretch")
+        if use_rf:
+            st.caption(f"Audio score above; fused evidence below (RF: {rf_src}). "
+                       "Dashed line = threshold, 1% false alarms on validation data.")
+            st.altair_chart(fused_timeline(df, fthr), width="stretch")
+        r = df.iloc[i]
+        wl, wr = st.columns([1, 2])
+        with wl:
+            st.markdown(f"##### {STATE_ICON.get(r.shown_state, '🟡')} {r.shown_label} · "
+                        f"{r.t:.1f}–{r.t + 1:.1f} s")
+            if r.shown_reason:
+                st.caption(f"Flagged: {r.shown_reason}")
+            if use_rf:
+                st.dataframe(pd.DataFrame({
+                    "evidence (log-likelihood ratio, capped)": ["audio", "RF", "fused"],
+                    "value": [f"{r.llr_audio:+.2f}", f"{r.llr_rf:+.2f}", f"{r.fused:+.2f}"]}),
+                    hide_index=True, width="stretch")
+                st.caption(f"Audio-only state: {S.state_label(r.state)}. "
+                           f"RF score {r.rf_p:.3f} ({S.state_label(r.rf_state)} on RF alone).")
+            st.metric("Audio model score", f"{r.p:.3f}", f"{r.p - det.threshold:+.3f} vs threshold",
+                      delta_color="off")
+            extra = {k: r[k] for k in ("margin", "distance", "spread") if k in r}
+            if extra:
+                st.dataframe(pd.DataFrame({
+                    "signal": ["logit margin to threshold", "distance from training data",
+                               "ensemble spread (logit)"][:len(extra)],
+                    "value": [f"{v:.2f}" for v in extra.values()]}),
+                    hide_index=True, width="stretch")
+            st.markdown("**Encoder hears:** " + r.tags)
+            st.audio(to_wav(clips[i]), format="audio/wav")
+        with wr:
+            mel, cam, _ = cam_for(key, i, clips[i], X.LAYERS[layer_name])
+            figure = cam_figure(mel, cam)
+            st.pyplot(figure, width="stretch")
+            plt.close(figure)
+            st.caption("Bright regions pushed the score towards 'drone'. A window scored "
+                       "'no drone' can still show weak evidence.")
+            if use_rf:
+                rf_fig = rf_figure(psd[i])
+                st.pyplot(rf_fig, width="stretch")
+                plt.close(rf_fig)
+                st.caption("Recorded RF snapshot replayed with this window (25 ms, both halves "
+                           "of the 2.4 GHz band, level removed).")
+        with st.expander("All windows"):
+            st.dataframe(df.drop(columns=["hit", "shown_state", "shown_reason",
+                                          *[c for c in L.AUDIO_FLAGS if c in df]]).round(3),
+                         hide_index=True, width="stretch")
 
 
 def main():
@@ -2412,24 +2632,18 @@ def main():
     manifest_path = DATA_DIR / "manifest.parquet"
     manifest = pd.read_parquet(manifest_path) if manifest_path.exists() else None
 
-    inputs = sidebar_inputs(manifest)
     bar_slot = st.empty()
     hero()
-    if inputs["audio"] is not None:
-        title = (Path(inputs["key"]).stem if not inputs["key"].startswith("upload")
-                 else inputs["key"].split(":")[1])
-        st.success(f"**{title}** is loaded. Open the **Replay detector** tab to see the "
-                   "result (it is computed automatically).")
     if missing:
         st.warning("Some evaluation reports are missing from reports/, so the tabs that use "
                    "them are limited: " + ", ".join(f"`{m}`" for m in missing)
                    + ". Re-run the evaluation scripts listed in README.md.")
-    tabs = st.tabs(["Project briefing", "Replay detector", "Fusion",
+    tabs = st.tabs(["Replay detector", "Project briefing", "Fusion",
                     "Audio intelligence", "RF research", "Proposal checklist"])
     with tabs[0]:
-        guarded("Project briefing", render_overview, reports, manifest)
+        guarded("Replay detector", render_live_monitor, manifest)
     with tabs[1]:
-        guarded("Replay detector", render_live_monitor, manifest, inputs)
+        guarded("Project briefing", render_overview, reports, manifest)
     with tabs[2]:
         guarded("Fusion", render_fusion_tab, reports["fusion"])
     with tabs[3]:
