@@ -123,6 +123,49 @@ def recording_verdict(states, min_run: int = 2) -> Verdict:
     return Verdict(state, reason, n, n_drone, n_unknown, n_low, run, min_run)
 
 
+def alarm_episodes(states, audio_states=None, rf_states=None, min_run: int = 2,
+                   hold: int = 3) -> list[dict]:
+    """Incidents in a sequence of window states, with the operations console's
+    rule (console/server.py, Session): an incident opens once `min_run` drone
+    windows (Known or Unknown) come in a row, and stays open until `hold`
+    windows pass without one.
+
+    Each incident: first and last window index, whether any window in it was an
+    unknown drone, and which sensors ('acoustic', 'radio') flagged a drone in it,
+    read from that sensor's own per-window states."""
+    if min_run < 1:
+        raise ValueError("min_run must be at least 1")
+    s = [str(x) for x in states]
+    episodes, run, cur, quiet = [], 0, None, 0
+    for i, state in enumerate(s):
+        drone = state in DRONE_STATES
+        run = run + 1 if drone else 0
+        if cur is None:
+            if run >= min_run:
+                cur, quiet = {"start": i - run + 1, "end": i}, 0
+        elif drone:
+            cur["end"], quiet = i, 0
+        else:
+            quiet += 1
+            if quiet >= hold:
+                episodes.append(cur)
+                cur = None
+    if cur is not None:
+        episodes.append(cur)
+    for ep in episodes:
+        span = range(ep["start"], ep["end"] + 1)
+        ep["unknown"] = any(s[i] == "unknown drone" for i in span)
+        sources = []
+        if audio_states is not None and any(str(audio_states[i]) in DRONE_STATES for i in span):
+            sources.append("acoustic")
+        if rf_states is not None and any(str(rf_states[i]) in DRONE_STATES for i in span):
+            sources.append("radio")
+        if not sources:      # only the fused evidence crossed: every sensor in use contributed
+            sources = ["acoustic"] + (["radio"] if rf_states is not None else [])
+        ep["sources"] = sources
+    return episodes
+
+
 # ---------------------------------------------------------------------------
 # Artifact readiness
 # ---------------------------------------------------------------------------
