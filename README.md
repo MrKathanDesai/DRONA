@@ -107,7 +107,7 @@ python scripts/eval_fusion.py                  # -> fusion.joblib (sum) + fusion
 `fusion_models.joblib` holds every rule and names the deployed one (the sum);
 a project that only has the older `fusion.joblib` still replays with the sum.
 
-**Audio input** (sidebar of *Replay detector*):
+**Audio input** (the **ACOUSTIC-01** tile on the *Replay detector* page; the RF feed and fusion rule are in the **RADIO-01** tile, and Theme and Replay settings in the collapsible sidebar):
 
 - dataset recordings: Svanström outdoor, DroneAudioDataset, ITU ARIS;
 - **any audio or video file**: WAV, MP3, M4A, FLAC, OGG, AAC, MP4, MOV, WEBM,
@@ -125,7 +125,11 @@ fifth of drone windows (see the results). Use only clips you may use.
 UI in `console/static/index.html`): the "DRONA" top bar with a state badge
 (STANDBY until a clip is analysed, then that clip's final state), sensor
 status dots and a UTC clock; hairline panels; small uppercase labels; the
-console's colours.
+console's colours. The first page, *Replay detector*, uses the console's
+three-column layout: sensor tiles (ACOUSTIC-01, RADIO-01, MODEL) with their
+controls on the left, the site sensor-coverage map and acoustic spectrum in
+the middle (with the full result below), and an incident list with CSV export
+on the right.
 
 **Theme.** The dashboard opens in **Dark**. Sidebar → Theme switches to System
 (follows the OS/browser) or Light. The choice is kept in the URL
