@@ -5,7 +5,8 @@
 \usetheme{Madrid}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage{lmodern}
+\usepackage{newtxtext,newtxmath}  % Times, matching the IEEE-format report
+\usefonttheme{serif}
 \usepackage{booktabs}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning}
@@ -100,6 +101,7 @@ AeroSonicDB & Outdoor aircraft check & 99 aircraft, 317 ambience recordings \\
 % 5 ---------------------------------------------------------------------
 \begin{frame}{System architecture}
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
   node distance=4mm and 6mm,
   box/.style={draw=accent, rounded corners=3pt, fill=accent!8, align=center,
@@ -119,7 +121,8 @@ AeroSonicDB & Outdoor aircraft check & 99 aircraft, 317 ambience recordings \\
   \draw[arr] (rf) -- (psd); \draw[arr] (psd) -- (forest);
   \draw[arr] (head) -| (fuse); \draw[arr] (forest) -| (fuse);
   \draw[arr] (fuse) -- (state);
-\end{tikzpicture}
+\end{tikzpicture}%
+}
 \vspace{8pt}
 \begin{itemize}\small
   \item Each sensor keeps its own detector; late fusion of calibrated evidence (log-likelihood ratios).
@@ -268,28 +271,41 @@ Left-out Phantom & 0.976 & 0.024 \\
 \end{frame}
 
 % 11 --------------------------------------------------------------------
-\begin{frame}{Analysis: what the results show --- and do not}
+\begin{frame}{Dashboard: the final decision at a glance}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  tile/.style={draw=#1, line width=1.2pt, rounded corners=4pt, fill=#1!12, align=center,
+               font=\footnotesize, minimum width=30mm, minimum height=14mm},
+  op/.style={font=\Large\bfseries, text=black!55}]
+  \node[tile=dronered] (a) {\textbf{Audio sensor}\\Known Drone};
+  \node[op, right=2mm of a] (p) {+};
+  \node[tile=dronered, right=2mm of p] (r) {\textbf{RF sensor}\\Known Drone\\[-1pt]{\scriptsize recorded replay}};
+  \node[op, right=2mm of r] (e) {=};
+  \node[tile=dronered, right=2mm of e, line width=2pt, minimum width=34mm] (f) {\textbf{Final (fused)}\\\textbf{Known Drone}};
+  \foreach \x/\c in {0/nogray,1/nogray,2/dronered,3/lowamber,4/dronered,5/dronered,6/nogray,7/dronered,8/nogray,9/nogray} {
+    \fill[\c] ([xshift=\x*11.2mm,yshift=-5mm]a.south west) rectangle ++(10.8mm,2.4mm); }
+  \foreach \x/\c in {0/dronered,1/dronered,2/dronered,3/dronered,4/dronered,5/dronered,6/dronered,7/dronered,8/dronered,9/dronered} {
+    \fill[\c] ([xshift=\x*11.2mm,yshift=-8.5mm]a.south west) rectangle ++(10.8mm,2.4mm); }
+  \foreach \x/\c in {0/lowamber,1/dronered,2/dronered,3/dronered,4/dronered,5/dronered,6/dronered,7/dronered,8/dronered,9/lowamber} {
+    \fill[\c] ([xshift=\x*11.2mm,yshift=-12mm]a.south west) rectangle ++(10.8mm,2.4mm); }
+  \node[anchor=east, font=\tiny] at ([xshift=-1mm,yshift=-3.8mm]a.south west) {Audio};
+  \node[anchor=east, font=\tiny] at ([xshift=-1mm,yshift=-7.3mm]a.south west) {RF};
+  \node[anchor=east, font=\tiny] at ([xshift=-1mm,yshift=-10.8mm]a.south west) {Fused};
+\end{tikzpicture}%
+}
+
+\vspace{6pt}
 \begin{columns}[T]
-\column{0.48\textwidth}
-\textbf{Show}
-\begin{itemize}\small
-  \item Audio works indoors and on an unseen drone.
-  \item Outdoors it catches about a fifth of drone windows at 1\% false alarms.
-  \item A near-perfect RF benchmark score was a session shortcut; v2 removes it.
-  \item Uncertainty flags catch 80\% of indoor errors.
-  \item No alarms on 99 real aircraft (AeroSonicDB).
-\end{itemize}
-\column{0.48\textwidth}
-\textbf{Do not show}
-\begin{itemize}\small
-  \item Field performance at a real site.
-  \item Synchronized audio+RF performance.
-  \item RF false alarms on real Wi-Fi/Bluetooth.
-  \item Calibrated audio probabilities.
-\end{itemize}
-\vspace{4pt}
-\textbf{Demo}: \texttt{streamlit run app/dashboard.py} --- briefing, replay with the result first,
-Grad-CAM, fusion ablation; \texttt{python -m console} for live microphone input.
+\column{0.5\textwidth}
+\small\textbf{Inputs}: dataset recordings, any audio/video file (MP3, MP4, \dots), a YouTube link,
+or the microphone. Detector runs automatically; result first, then a window-by-window strip and
+Grad-CAM. Only the sound of a video is used.
+\column{0.46\textwidth}
+\begin{alertblock}{Not yet proven}
+\footnotesize Field performance; synchronized audio+RF (RF here is recorded replay, never recorded
+with the audio); RF false alarms on real Wi-Fi/Bluetooth.
+\end{alertblock}
 \end{columns}
 \end{frame}
 
