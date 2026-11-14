@@ -41,3 +41,27 @@ def test_calibration_file_is_valid():
     s = Session(**CALIBRATION)
     states = ["drone"] * s.confirm
     assert [s.step(x) for x in states][-1] == "drone"
+
+
+def test_session_audio_keeps_exact_time_at_48k():
+    from console.server import SessionAudio
+    s = SessionAudio(48000)
+    t = np.arange(48000 * 5) / 48000
+    x = np.sin(2 * np.pi * 440 * t).astype(np.float32)
+    for i in range(0, len(x), 4096):                  # browser-sized chunks
+        s.add(x[i:i + 4096])
+    assert s.end_s == 5.0
+    clip = s.slice(1.0, 3.5)
+    assert len(clip) == int(2.5 * 16000)
+    assert 0.6 < float(np.sqrt(np.mean(clip ** 2))) < 0.8   # the tone survives resampling
+
+
+def test_session_audio_drops_old_sound_and_clamps_slices():
+    from console.server import SessionAudio
+    s = SessionAudio(16000, max_s=3)
+    for k in range(5):
+        s.add(np.full(16000, k, np.float32))          # second k has value k
+    assert s.end_s == 5.0 and s.offset == 2 * 16000
+    assert len(s.slice(0, 2)) == 0                    # already dropped
+    assert set(np.unique(s.slice(2.0, 3.0))) == {2.0}
+    assert len(s.slice(4.5, 9)) == 8000               # clamped to what exists

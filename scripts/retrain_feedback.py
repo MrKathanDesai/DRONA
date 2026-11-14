@@ -5,9 +5,10 @@
     python scripts/retrain_feedback.py --status   # labelled clips and version history
     python scripts/retrain_feedback.py --rollback # back to the previous version
 
-The live page (python -m console) does the same from its Model panel. The
-labelled clips come from the incident queue there (Confirm drone / False alarm
-/ Report missed drone). See src/dronedet/feedback.py for the gate.
+POST /retrain on a running console does the same and swaps the new model in.
+The labelled clips come from the console: incidents reviewed as Drone / Not
+drone, Report missed drone, and stretches marked on the session review strip.
+See src/dronedet/feedback.py for the gate.
 """
 from __future__ import annotations
 

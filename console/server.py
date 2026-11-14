@@ -5,10 +5,15 @@
 
 Acoustic (primary): the browser captures sound, from the microphone or an audio
 file it plays out loud, and streams raw samples here. Once per second the audio
-detector judges the last second. Sound is not stored, except the clips an
-operator labels (Confirm drone / False alarm / Report missed drone), which go to
-data/feedback/ and can retrain the detector behind a safety gate
-(src/dronedet/feedback.py).
+detector judges the last second.
+
+Review and labels: the current source's sound is kept in memory (16 kHz, up to
+SESSION_MAX_S, dropped when a new source starts or the page disconnects) so an
+operator can replay any stretch and label it "drone" or "not drone": a missed
+drone, a false alarm, a confirmed detection. Only labelled stretches are
+written, to data/feedback/, where they can retrain the detector behind a
+safety gate (src/dronedet/feedback.py; scripts/retrain_feedback.py, or POST
+/retrain).
 
 Radio (secondary): a laptop cannot receive raw 2.4 GHz signals (its Wi-Fi chip
 only hands over decoded Wi-Fi packets), so the radio panel replays recorded
@@ -39,13 +44,16 @@ for _p in (ROOT / "src", ROOT):
 
 import joblib
 import numpy as np
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from scipy.signal import resample_poly
 
 STATIC = Path(__file__).parent / "static"
 HOP_S = 1.0                     # one decision per second, the spacing the alarm rule was calibrated on
 DRONE_STATES = {"drone", "unknown drone"}
+SR = 16000
+SESSION_MAX_S = 900             # sound kept in memory for review: the last 15 minutes
+LABEL_MIN_S, LABEL_MAX_S = 0.5, 60.0
 
 _cal = Path(__file__).parent / "calibration.json"           # written by scripts/calibrate_live.py
 CALIBRATION = ({k: v for k, v in json.loads(_cal.read_text()).items() if k in ("confirm", "hold")}
@@ -53,6 +61,45 @@ CALIBRATION = ({k: v for k, v in json.loads(_cal.read_text()).items() if k in ("
 
 _model: dict = {}
 _lock = threading.Lock()
+
+
+class SessionAudio:
+    """The current source's sound at 16 kHz, in memory only, for replay and labels.
+
+    Raw samples arrive at the browser's rate; they are resampled in whole
+    one-second blocks so that a time in seconds maps to an exact sample. Times
+    are seconds since the source started; the oldest sound beyond `max_s` is
+    dropped."""
+
+    def __init__(self, rate: int, max_s: float = SESSION_MAX_S):
+        self.rate, self.max = rate, int(max_s * SR)
+        self.pending = np.zeros(0, np.float32)
+        self.chunks: list[np.ndarray] = []
+        self.n = self.offset = 0
+
+    def add(self, x: np.ndarray) -> None:
+        self.pending = np.concatenate([self.pending, x])
+        while len(self.pending) >= self.rate:
+            block, self.pending = self.pending[:self.rate], self.pending[self.rate:]
+            y = to_16k(block, self.rate)[:SR]
+            self.chunks.append(np.pad(y, (0, SR - len(y))))
+            self.n += SR
+        while self.n > self.max:
+            self.offset += len(self.chunks[0])
+            self.n -= len(self.chunks.pop(0))
+
+    @property
+    def end_s(self) -> float:
+        return (self.offset + self.n) / SR
+
+    def slice(self, start_s: float, end_s: float) -> np.ndarray:
+        a = max(int(round(start_s * SR)) - self.offset, 0)
+        b = min(int(round(end_s * SR)) - self.offset, self.n)
+        if b <= a:
+            return np.zeros(0, np.float32)
+        if len(self.chunks) > 1:
+            self.chunks = [np.concatenate(self.chunks)]
+        return self.chunks[0][a:b].copy()
 
 
 class Session:
@@ -206,18 +253,6 @@ def config():
     return JSONResponse({"alarm_rule": CALIBRATION})
 
 
-@app.post("/feedback")
-async def feedback(request: Request, id: str, label: str, rate: int, input: str = ""):
-    """A labelled clip from the incident queue: raw float32 samples at `rate`."""
-    from dronedet import feedback as FB
-    x = np.frombuffer(await request.body(), dtype=np.float32)
-    try:
-        row = await asyncio.to_thread(FB.save_clip, id, label, to_16k(x, rate), input)
-    except ValueError as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
-    return JSONResponse({"ok": True, "clip": row, "model": FB.status()})
-
-
 @app.get("/model")
 def model_status():
     from dronedet import feedback as FB
@@ -263,15 +298,18 @@ def rf_scenes():
 
 @app.websocket("/ws")
 async def ws(sock: WebSocket):
-    """Two independent channels on one socket: "audio" (primary) and "radio"."""
+    """One socket: "audio" (primary) and "radio" verdicts out; sound, control,
+    review ("get") and label ("label") messages in."""
     await sock.accept()
-    c = {"rate": 48000, "buf": np.zeros(0, np.float32), "pending": 0, "mic": False,
-         "rf_key": None, "rf_i": 0, "audio": session(), "radio": session()}
+    c = {"rate": 48000, "buf": np.zeros(0, np.float32), "pending": 0, "mic": False, "samples": 0,
+         "sound": SessionAudio(48000), "rf_key": None, "rf_i": 0, "audio": session(), "radio": session()}
     send_lock = asyncio.Lock()
 
-    async def send(obj):
+    async def send(obj, data: bytes | None = None):
         async with send_lock:
             await sock.send_text(json.dumps(obj))
+            if data is not None:
+                await sock.send_bytes(data)
 
     async def radio_loop():
         while True:
@@ -284,6 +322,21 @@ async def ws(sock: WebSocket):
             await send({"type": "radio", "verdict": v, "column": column,
                         "unfamiliar": v == "drone" and c["radio"].unfamiliar})
 
+    async def label(m):
+        from dronedet import feedback as FB
+        start, end = float(m.get("start", 0)), float(m.get("end", 0))
+        if not LABEL_MIN_S <= end - start <= LABEL_MAX_S:
+            return await send({"type": "labelled", "id": m.get("id"), "ok": False,
+                               "error": f"choose between {LABEL_MIN_S:g} and {LABEL_MAX_S:g} seconds"})
+        y = c["sound"].slice(start, end)
+        try:
+            await asyncio.to_thread(FB.save_clip, str(m.get("id", "")), str(m.get("label", "")),
+                                    y, str(m.get("input", "")))
+            await send({"type": "labelled", "id": m.get("id"), "ok": True, "label": m.get("label"),
+                        "start": start, "end": end})
+        except ValueError as e:
+            await send({"type": "labelled", "id": m.get("id"), "ok": False, "error": str(e)})
+
     task = asyncio.create_task(radio_loop())
     try:
         while True:
@@ -294,17 +347,26 @@ async def ws(sock: WebSocket):
                 m = json.loads(msg["text"])
                 kind = m.get("type")
                 if kind == "start":
-                    c.update(rate=int(m.get("rate", 48000)), mic=m.get("input") == "mic",
-                             buf=np.zeros(0, np.float32), pending=0, audio=session())
+                    rate = int(m.get("rate", 48000))
+                    c.update(rate=rate, mic=m.get("input") == "mic", buf=np.zeros(0, np.float32),
+                             pending=0, samples=0, sound=SessionAudio(rate), audio=session())
                 elif kind == "stop":
                     c["audio"] = session()
                 elif kind == "rf":
                     key = m.get("source")
                     c.update(rf_key=key if key in _model.get("rf_scenes", {}) else None,
                              rf_i=0, radio=session())
+                elif kind == "get":                          # replay a stretch of this source
+                    start, end = float(m.get("start", 0)), float(m.get("end", 0))
+                    y = c["sound"].slice(start, min(end, start + LABEL_MAX_S))
+                    await send({"type": "clip", "id": m.get("id"), "rate": SR, "n": len(y)}, y.tobytes())
+                elif kind == "label":
+                    await label(m)
                 continue
             x = np.frombuffer(msg["bytes"], dtype=np.float32)
             rate = c["rate"]
+            c["sound"].add(x)
+            c["samples"] += len(x)
             c["buf"] = np.concatenate([c["buf"], x])[-rate:]
             c["pending"] += len(x)
             if len(c["buf"]) < rate or c["pending"] < HOP_S * rate:
@@ -312,7 +374,7 @@ async def ws(sock: WebSocket):
             c["pending"] = 0
             state = await asyncio.to_thread(classify, to_16k(c["buf"], rate), c["mic"])
             v = c["audio"].step(state)
-            await send({"type": "audio", "verdict": v,
+            await send({"type": "audio", "verdict": v, "t": round(c["samples"] / rate, 2),
                         "unfamiliar": v == "drone" and c["audio"].unfamiliar})
     except WebSocketDisconnect:
         pass

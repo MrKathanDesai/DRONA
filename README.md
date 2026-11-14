@@ -224,10 +224,15 @@ python -m console --mic-model speaker   # mic uses the playback-trained detector
 - **Site map, timeline, incidents:** sensor coverage lights up on contact
   (the sensors are omnidirectional, so no bearing is shown); every detection
   becomes an incident with its sources, audio playback and CSV export.
-- **Learning from the operator:** each incident with audio is labelled
-  *Confirm drone* or *False alarm*, and *Report missed drone* saves the last
-  8 s as a drone. Only labelled clips are stored (`data/feedback/`).
-  *Retrain* (Model panel, or `python scripts/retrain_feedback.py`) rebuilds
+- **Session review:** the current recording's sound is kept in memory (up to
+  15 minutes, dropped when a new source starts) and drawn as a strip of
+  per-second calls. Drag across any stretch to replay it and mark it *drone*
+  (for example a drone the detector missed) or *not drone*.
+- **Learning from the operator:** each detection is reviewed as *Drone* or
+  *Not drone*; *Report missed drone* marks the last 8 s as a drone; any
+  stretch can be marked from the session strip. Only labelled stretches are
+  stored (`data/feedback/`). Retraining (`python scripts/retrain_feedback.py`,
+  or `POST /retrain` on the running console, which swaps the model in) rebuilds
   the detector head on the original training data plus every label, in
   seconds, and promotes the new model only if it passes a gate: no more than
   0.02 drone recall lost and no more false alarms on the outdoor held-out

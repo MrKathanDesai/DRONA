@@ -1,7 +1,8 @@
 """Operator feedback: labelled clips -> retrained detector, behind a safety gate.
 
-Every incident an operator labels ("drone" / "not drone"), and every drone they
-report as missed, is saved as a 16 kHz clip in data/feedback/. Retraining
+Every incident an operator labels ("drone" / "not drone"), every drone they
+report as missed, and every stretch they mark on the console's session review
+strip, is saved as a 16 kHz clip in data/feedback/. Retraining
 rebuilds the detector head on the original tier-4 training data plus every
 labelled clip (the pretrained encoder stays frozen), then compares the new
 model (challenger) with the one in use (champion):
