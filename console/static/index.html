@@ -8,9 +8,10 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%23e9ecef' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23e05a3f'/%3E%3C/svg%3E">
 <style>
 :root{
-  --bg: oklch(14.5% 0.006 250);
-  --panel: oklch(17.5% 0.007 250);
-  --line: oklch(25% 0.008 250);
+  --bg: oklch(14% 0.006 250);
+  --panel: oklch(17% 0.007 250);
+  --raised: oklch(20% 0.008 250);
+  --line: oklch(24.5% 0.008 250);
   --line-2: oklch(31% 0.009 250);
   --ink: oklch(94% 0.004 250);
   --ink-2: oklch(72% 0.008 250);
@@ -19,269 +20,319 @@
   --maybe: oklch(81% 0.13 80);
   --alert: oklch(66% 0.2 32);
   --unknown: oklch(68% 0.13 300);
+  --radio: oklch(72% 0.09 235);
   --tone: var(--ink-3);
   --ease: cubic-bezier(.16, 1, .3, 1);
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --gutter: clamp(18px, 3.2vw, 44px);
 }
-body[data-state="clear"]{ --tone: var(--clear) }
-body[data-state="maybe"]{ --tone: var(--maybe) }
-body[data-state="drone"]{ --tone: var(--alert) }
-body[data-state="drone"][data-unknown="1"]{ --tone: var(--unknown) }
+body[data-threat="clear"]{ --tone: var(--clear) }
+body[data-threat="caution"]{ --tone: var(--maybe) }
+body[data-threat="alert"]{ --tone: var(--alert) }
+body[data-threat="alert"][data-unknown="1"]{ --tone: var(--unknown) }
 
 *{ box-sizing: border-box; margin: 0; padding: 0 }
+html, body{ height: 100% }
 body{
-  font-family: var(--font); background: var(--bg); color: var(--ink);
-  -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column;
+  font-family: var(--font); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
+  display: grid; grid-template-rows: auto 1fr; overflow: hidden; font-size: 13px;
 }
 button, select, input{ font: inherit; color: inherit }
-.label{ font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3) }
+.lbl{ font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3) }
+.val{ font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase }
+:focus-visible{ outline: 2px solid var(--ink); outline-offset: 2px }
 
 /* ---------- top bar ---------- */
-.bar{
-  display: flex; align-items: center; gap: 22px; padding: 14px var(--gutter);
-  border-bottom: 1px solid var(--line);
+.bar{ display: flex; align-items: center; gap: 18px; padding: 0 18px; height: 52px; border-bottom: 1px solid var(--line) }
+.mark{ font-size: 13px; font-weight: 700; letter-spacing: .32em }
+.site{ color: var(--ink-3); letter-spacing: .14em }
+.sep{ width: 1px; height: 20px; background: var(--line-2) }
+.threat{
+  min-width: 112px; text-align: center; padding: 6px 12px; border-radius: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .2em; color: var(--tone);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 55%, transparent);
+  background: color-mix(in srgb, var(--tone) 10%, transparent); transition: color .4s, box-shadow .4s, background-color .4s;
 }
-.mark{ font-size: 14px; font-weight: 700; letter-spacing: .32em }
-.chips{ display: flex; gap: 8px; flex-wrap: wrap }
-.chip{
-  display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px;
-  font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2);
-}
-.chip i{ width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3) }
-.chip.live i{ background: var(--clear) }
-.chip.hit{ color: var(--alert); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--alert) 50%, transparent) }
-.chip.hit i{ background: var(--alert) }
+body[data-threat="alert"] .threat{ background: var(--tone); color: var(--bg); animation: beat 1.4s var(--ease) infinite }
+@keyframes beat{ 50%{ opacity: .72 } }
+.health{ display: flex; gap: 14px }
+.health span{ display: inline-flex; align-items: center; gap: 7px }
+.dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); flex: none; transition: background-color .3s }
+.dot.on{ background: var(--clear) } .dot.hit{ background: var(--alert) } .dot.warn{ background: var(--maybe) } .dot.rf{ background: var(--radio) }
 .spacer{ flex: 1 }
-.clock{ font-size: 13px; font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; letter-spacing: .04em }
+.open-count{ color: var(--alert) }
+.clock{ font-size: 12px; font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; letter-spacing: .04em }
 
-/* ---------- flag ---------- */
-.flag{ display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows .5s var(--ease) }
-.flag.on{ grid-template-rows: 1fr; visibility: visible }
-.flag > div{ overflow: hidden }
-.flag .inner{
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px var(--gutter);
-  background: color-mix(in srgb, var(--alert) 16%, var(--bg)); border-bottom: 1px solid color-mix(in srgb, var(--alert) 45%, transparent);
-}
-.flag svg{ width: 15px; height: 15px; color: var(--alert); flex: none }
-.flag p{ flex: 1; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase }
-.flag p span{ color: var(--ink-2); font-weight: 500 }
-.btn{
-  border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer;
-  font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-  transition: background-color .25s, color .25s, opacity .25s;
-}
-.btn:focus-visible, .seg input:focus-visible + label, select:focus-visible{ outline: 2px solid var(--ink); outline-offset: 2px }
-.btn.primary{ background: var(--ink); color: var(--bg) }
-.btn.primary:hover{ background: oklch(100% 0 0 / .85) }
-.btn.alert{ background: var(--alert); color: oklch(98% 0.005 85) }
-.btn:disabled{ opacity: .3; cursor: default }
+/* ---------- layout ---------- */
+.ops{ display: grid; grid-template-columns: 290px minmax(0, 1fr) 340px; gap: 1px; background: var(--line); min-height: 0 }
+.col{ background: var(--bg); display: flex; flex-direction: column; min-height: 0; overflow: auto }
+.center{ display: grid; grid-template-rows: minmax(220px, 1.25fr) minmax(170px, 1fr) auto; gap: 1px; background: var(--line); min-height: 0 }
+.center > section{ background: var(--bg); min-height: 0; display: flex; flex-direction: column }
+.head{ display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px 10px }
 
-/* ---------- status ---------- */
-.status{
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 32px;
-  padding: clamp(28px, 6vh, 64px) var(--gutter) clamp(24px, 4vh, 40px);
-}
-h1{
-  font-size: clamp(52px, 8.2vw, 120px); line-height: .95; font-weight: 650; letter-spacing: -.04em;
-  margin: 14px 0 18px; color: var(--ink); transition: color .5s var(--ease);
-}
-body[data-state="drone"] h1{ color: var(--tone) }
-.swap{ animation: rise .55s var(--ease) both }
-@keyframes rise{ from{ opacity: 0; transform: translateY(8px) } }
-.tags{ display: flex; gap: 8px; min-height: 26px; flex-wrap: wrap }
-.tags .chip{ color: var(--ink) }
-.tags .chip.tone{ color: var(--tone); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--tone) 55%, transparent) }
-
-.controls{ display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 30px }
-.seg{ display: inline-grid; grid-auto-flow: column; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--line-2); padding: 3px }
+/* ---------- sensor tiles ---------- */
+.tile{ border-bottom: 1px solid var(--line); padding: 14px 16px 16px }
+.tile .top{ display: flex; align-items: center; gap: 9px; margin-bottom: 12px }
+.tile .name{ font-size: 12px; font-weight: 700; letter-spacing: .14em }
+.tile .kind{ color: var(--ink-3); font-size: 11px; margin-left: auto }
+.state{ font-size: 22px; font-weight: 650; letter-spacing: -.01em; margin: 2px 0 12px; transition: color .4s }
+.state.drone{ color: var(--alert) } .state.maybe{ color: var(--maybe) } .state.clear{ color: var(--clear) } .state.idle{ color: var(--ink-3) }
+.row{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap }
+.row + .row{ margin-top: 8px }
+.seg{ display: inline-grid; grid-auto-flow: column; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--line-2); padding: 2px }
 .seg input{ position: absolute; opacity: 0; pointer-events: none }
-.seg label{
-  padding: 7px 14px; border-radius: 6px; cursor: pointer; user-select: none;
-  font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3);
-  transition: background-color .25s, color .25s;
-}
+.seg label{ padding: 6px 11px; border-radius: 5px; cursor: pointer; user-select: none; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; color: var(--ink-3); transition: background-color .2s, color .2s }
 .seg input:checked + label{ background: var(--line-2); color: var(--ink) }
-.file{ display: none }
-body[data-input="file"] .file{ display: inline-flex }
-.file label{
-  display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 8px; cursor: pointer;
-  font-size: 13px; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2); max-width: 300px;
+.seg input:focus-visible + label{ outline: 2px solid var(--ink) }
+.btn{
+  border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line-2); font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  transition: background-color .2s, opacity .2s;
 }
-.file label.over{ box-shadow: inset 0 0 0 1px var(--ink-2); color: var(--ink) }
-.file label span{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.btn:hover{ background: var(--line-2) }
+.btn.primary{ background: var(--ink); color: var(--bg); box-shadow: none }
+.btn.primary:hover{ background: oklch(100% 0 0 / .85) }
+.btn:disabled{ opacity: .3; cursor: default }
+.file{ display: none; flex: 1; min-width: 0 }
+body[data-input="file"] .file{ display: flex }
+.file label{ flex: 1; min-width: 0; padding: 7px 10px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line-2); cursor: pointer; color: var(--ink-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.file label.over{ box-shadow: inset 0 0 0 1px var(--ink-2) }
 .file input{ display: none }
-.progress{ height: 2px; background: var(--line); margin-top: 18px; max-width: 420px; opacity: 0; transition: opacity .3s }
+.meter{ display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; height: 8px; margin-top: 12px }
+.meter i{ background: var(--line); border-radius: 1px; transition: background-color .08s }
+.meter i.on{ background: var(--ink-2) } .meter i.on.hot{ background: var(--maybe) }
+.progress{ height: 2px; background: var(--line); margin-top: 10px; opacity: 0 }
 .progress i{ display: block; height: 100%; background: var(--ink-2); transform-origin: left; transform: scaleX(0) }
 body.running[data-input="file"] .progress{ opacity: 1 }
-
-/* ring */
-.ring{ --level: 0; position: relative; width: clamp(180px, 22vw, 280px); aspect-ratio: 1 }
-.ring span{ position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--line-2) }
-.ring span:nth-child(2){ inset: 17% }
-.ring span:nth-child(3){ inset: 34%; box-shadow: inset 0 0 0 1px var(--tone); transition: box-shadow .5s }
-.ring .level{
-  position: absolute; inset: 34%; border-radius: 50%; background: color-mix(in oklch, var(--tone) 16%, transparent);
-  transform: scale(calc(1 + var(--level) * 1.9)); transition: transform .15s linear, background-color .5s;
-}
-.ring .core{ position: absolute; inset: 46%; border-radius: 50%; background: var(--tone); transition: background-color .5s }
-.ring .tick{ position: absolute; left: 50%; top: -6px; width: 1px; height: 12px; background: var(--line-2) }
-.ring .tick.b{ top: auto; bottom: -6px } .ring .tick.l, .ring .tick.r{ top: 50%; left: -6px; width: 12px; height: 1px }
-.ring .tick.r{ left: auto; right: -6px }
-body[data-state="drone"] .ring span:nth-child(1), body[data-state="drone"] .ring span:nth-child(2){
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--tone) 60%, transparent); animation: pulse 1.8s var(--ease) infinite }
-body[data-state="drone"] .ring span:nth-child(1){ animation-delay: .25s }
-@keyframes pulse{ 50%{ opacity: .35 } }
-
-/* ---------- panels ---------- */
-.grid{
-  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1px; background: var(--line);
-  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); flex: 1;
-}
-.panel{ background: var(--bg); padding: 18px var(--gutter) 22px; display: flex; flex-direction: column; min-width: 0 }
-.panel.wide{ grid-column: 1 / -1 }
-.panel header{ display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; min-height: 30px }
-.spec{
-  position: relative; border-radius: 8px; overflow: hidden; flex: 1;
-  background: repeating-linear-gradient(to bottom, transparent 0 calc(25% - 1px), var(--line) calc(25% - 1px) 25%), var(--panel);
-}
-.spec canvas{ display: block; width: 100%; height: 100% }
-.spec.audio{ height: clamp(170px, 26vh, 260px); flex: none }
-.spec.radio{ min-height: 110px }
-.spec .idle{ position: absolute; inset: 0; display: grid; place-items: center; transition: opacity .4s }
-body.used .spec.audio .idle, body.rfon .spec.radio .idle{ opacity: 0 }
-
 select{
-  appearance: none; -webkit-appearance: none; background: var(--panel); border: 0; border-radius: 6px;
-  box-shadow: inset 0 0 0 1px var(--line-2); padding: 7px 30px 7px 12px; font-size: 13px; cursor: pointer;
-  max-width: 100%; background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
-  background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat;
+  appearance: none; -webkit-appearance: none; width: 100%; background: var(--panel); border: 0; border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--line-2); padding: 7px 28px 7px 10px; font-size: 12px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 52%, calc(100% - 9px) 52%; background-size: 5px 5px; background-repeat: no-repeat;
 }
-.radio-row{ display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap }
+.mini{ height: 64px; margin-top: 10px; border-radius: 6px; background: var(--panel); overflow: hidden }
+.mini canvas{ width: 100%; height: 100%; display: block }
+.note{ color: var(--ink-3); font-size: 11.5px; line-height: 1.45; margin-top: 10px }
 
-.log{ list-style: none; overflow: auto; max-height: 260px }
-.log li{
-  display: grid; grid-template-columns: 8px 1fr auto; gap: 12px; align-items: baseline;
-  padding: 11px 0; border-top: 1px solid var(--line); animation: rise .5s var(--ease) both;
-}
-.log li:first-child{ border-top: 0 }
-.log li i{ width: 7px; height: 7px; border-radius: 50%; background: var(--alert); transform: translateY(-1px) }
-.log li.unknown i{ background: var(--unknown) }
-.log li b{ font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase }
-.log li small{ display: block; font-size: 12px; color: var(--ink-3); margin-top: 3px }
-.log li time{ font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums }
-.log li.now time{ color: var(--alert) }
-.log li .f{ margin-left: 8px; font-size: 10px; font-weight: 700; letter-spacing: .14em; color: var(--alert) }
-.log .none{ display: block; padding: 6px 0; border: 0 }
+/* ---------- site map ---------- */
+.map{ flex: 1; min-height: 0; position: relative }
+.map svg{ position: absolute; inset: 0; width: 100%; height: 100% }
+.map .grid line{ stroke: var(--line); stroke-width: 1 }
+.map .perimeter{ fill: none; stroke: var(--line-2); stroke-width: 1.5; stroke-dasharray: 6 5 }
+.map .bldg{ fill: var(--panel); stroke: var(--line-2) }
+.map .cov-a{ fill: color-mix(in srgb, var(--tone) 7%, transparent); stroke: color-mix(in srgb, var(--tone) 55%, transparent); stroke-width: 1.2; transition: fill .5s, stroke .5s }
+.map .cov-r{ fill: none; stroke: color-mix(in srgb, var(--radio) 45%, transparent); stroke-width: 1; stroke-dasharray: 3 5; opacity: .35; transition: opacity .4s }
+body.rfon .map .cov-r{ opacity: 1 }
+body[data-threat="alert"] .map .cov-a{ fill: color-mix(in srgb, var(--tone) 20%, transparent); animation: beat 1.4s var(--ease) infinite }
+body[data-threat="alert"][data-src~="radio"] .map .cov-r{ stroke: var(--alert); animation: beat 1.4s var(--ease) infinite }
+.map .node{ fill: var(--bg); stroke: var(--ink); stroke-width: 1.5 }
+.map text{ fill: var(--ink-3); font: 600 10px var(--font); letter-spacing: .14em }
+.map .contact{ fill: var(--alert); font-weight: 700; opacity: 0; transition: opacity .3s }
+body[data-threat="alert"] .map .contact{ opacity: 1 }
 
-@media (max-width: 900px){
-  .status{ grid-template-columns: 1fr }
-  .ring{ display: none }
-  .grid{ grid-template-columns: 1fr }
-  .bar .chips{ display: none }
+/* ---------- spectra ---------- */
+.spectra{ display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line); flex: 1; min-height: 0 }
+.spectra > div{ background: var(--bg); display: flex; flex-direction: column; min-height: 0 }
+.spec{ position: relative; flex: 1; margin: 0 16px 14px; border-radius: 6px; overflow: hidden; min-height: 90px;
+  background: repeating-linear-gradient(to bottom, transparent 0 calc(25% - 1px), var(--line) calc(25% - 1px) 25%), var(--panel) }
+.spec canvas{ position: absolute; inset: 0; width: 100%; height: 100% }
+.spec .idle{ position: absolute; inset: 0; display: grid; place-items: center; transition: opacity .3s }
+body.used .spec.raw .idle{ opacity: 0 }
+
+/* ---------- timeline ---------- */
+.timeline{ padding: 10px 16px 14px; display: grid; grid-template-columns: 74px 1fr; gap: 6px 10px; align-items: center }
+.track{ display: flex; gap: 1px; height: 12px }
+.track i{ flex: 1; background: var(--panel); border-radius: 1px }
+.track i.clear{ background: color-mix(in srgb, var(--clear) 45%, var(--panel)) }
+.track i.maybe{ background: var(--maybe) } .track i.drone{ background: var(--alert) }
+
+/* ---------- incidents ---------- */
+.incidents{ list-style: none; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px }
+.inc{ border-radius: 8px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); padding: 12px; animation: rise .45s var(--ease) both }
+.inc.open{ box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alert) 55%, transparent) }
+.inc.live{ background: color-mix(in srgb, var(--alert) 9%, var(--panel)) }
+@keyframes rise{ from{ opacity: 0; transform: translateY(6px) } }
+.inc .t{ display: flex; justify-content: space-between; align-items: baseline; gap: 8px }
+.inc .id{ font-weight: 700; letter-spacing: .12em; font-size: 12px }
+.inc .when{ color: var(--ink-3); font-size: 11.5px; font-variant-numeric: tabular-nums }
+.inc .what{ margin: 8px 0 10px; font-size: 13px }
+.inc .what b{ font-weight: 650 }
+.inc .what small{ display: block; color: var(--ink-3); font-size: 11.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.chips{ display: flex; gap: 6px; flex-wrap: wrap }
+.chip{ font-size: 9.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; padding: 3px 7px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line-2); color: var(--ink-2) }
+.chip.ac{ color: var(--ink) } .chip.rf{ color: var(--radio) } .chip.unk{ color: var(--unknown) }
+.chip.st{ color: var(--alert); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alert) 55%, transparent) }
+.chip.st.done{ color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--line-2) }
+.chip.st.ok{ color: var(--clear); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--clear) 50%, transparent) }
+.inc .acts{ display: flex; gap: 6px; margin-top: 10px }
+.empty{ padding: 18px 16px; color: var(--ink-3) }
+
+@media (max-width: 1180px){
+  body{ overflow: auto; height: auto }
+  .ops{ grid-template-columns: 1fr }
+  .center{ grid-template-rows: 300px 220px auto }
+  .health, .site, .sep{ display: none }
 }
 @media (prefers-reduced-motion: reduce){ *, *::before, *::after{ animation: none !important; transition: none !important } }
 </style>
 </head>
-<body data-state="idle" data-input="mic">
+<body data-threat="standby" data-input="mic" data-src="">
 
-<div class="bar">
+<header class="bar">
   <span class="mark">DRONA</span>
-  <div class="chips">
-    <span class="chip" id="chip-audio"><i></i>Acoustic</span>
-    <span class="chip" id="chip-radio"><i></i>Radio</span>
+  <span class="lbl site">Site 01</span>
+  <span class="sep"></span>
+  <span class="threat" id="threat">STANDBY</span>
+  <div class="health lbl">
+    <span><i class="dot" id="h-ac"></i>Acoustic</span>
+    <span><i class="dot" id="h-rf"></i>Radio</span>
   </div>
   <span class="spacer"></span>
-  <span class="chip" id="chip-link"><i></i><span>Link</span></span>
+  <span class="lbl open-count" id="open-count"></span>
+  <span class="lbl" style="display:inline-flex;gap:7px;align-items:center"><i class="dot" id="link"></i>Link</span>
   <span class="clock" id="clock"></span>
-</div>
+</header>
 
-<div class="flag" id="flag" role="status" aria-live="polite"><div><div class="inner">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>
-  <p id="flag-text"></p>
-  <button class="btn alert" id="flag-ok">Mark reviewed</button>
-</div></div></div>
-
-<main style="display:flex;flex-direction:column;flex:1">
-  <section class="status">
-    <div>
-      <span class="label" id="eyebrow">Acoustic detection</span>
-      <h1 id="headline">Standby</h1>
-      <div class="tags" id="tags"></div>
-      <div class="controls">
+<div class="ops">
+  <!-- sensors -->
+  <aside class="col">
+    <section class="tile">
+      <div class="top"><i class="dot" id="ac-dot"></i><span class="name">ACOUSTIC-01</span><span class="kind">Primary</span></div>
+      <div class="lbl">State</div>
+      <div class="state idle" id="ac-state">Offline</div>
+      <div class="row">
         <div class="seg" role="radiogroup" aria-label="Sound source">
-          <input type="radio" name="src" id="src-mic" value="mic" checked><label for="src-mic">Microphone</label>
-          <input type="radio" name="src" id="src-file" value="file"><label for="src-file">File</label>
+          <input type="radio" name="src" id="src-mic" value="mic" checked><label for="src-mic">MIC</label>
+          <input type="radio" name="src" id="src-file" value="file"><label for="src-file">FILE</label>
         </div>
-        <span class="file"><label id="drop"><input type="file" id="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.flac,.ogg,.webm"><span id="drop-text">Choose recording</span></label></span>
         <button class="btn primary" id="go" disabled>Start</button>
       </div>
+      <div class="row file"><label id="drop"><input type="file" id="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.flac,.ogg,.webm"><span id="drop-text">Choose recording…</span></label></div>
+      <div class="meter" id="meter" aria-hidden="true"></div>
+      <div class="row" style="margin-top:12px"><button class="btn" id="missed" disabled>Report missed drone</button></div>
       <div class="progress"><i id="progress"></i></div>
-    </div>
-    <div class="ring" id="ring" aria-hidden="true">
-      <span></span><span></span><span></span><div class="level"></div><div class="core"></div>
-      <i class="tick"></i><i class="tick b"></i><i class="tick l"></i><i class="tick r"></i>
-    </div>
-  </section>
-
-  <div class="grid">
-    <section class="panel wide">
-      <header><span class="label">Acoustic spectrum</span><span class="label" id="audio-state"></span></header>
-      <div class="spec audio"><canvas id="spec"></canvas><div class="idle label">No input</div></div>
     </section>
 
-    <section class="panel">
-      <header><span class="label">Radio · 2.4 GHz · recorded replay</span><span class="label" id="radio-state">Off</span></header>
-      <div class="radio-row">
-        <select id="rf-src" aria-label="Recorded radio signal"><option value="">Off</option></select>
+    <section class="tile">
+      <div class="top"><i class="dot" id="rf-dot"></i><span class="name">RADIO-01</span><span class="kind">Recorded replay</span></div>
+      <div class="lbl">State</div>
+      <div class="state idle" id="rf-state">Off</div>
+      <select id="rf-src" aria-label="Recorded radio signal"><option value="">Off</option></select>
+      <div class="mini"><canvas id="rfspec"></canvas></div>
+      <p class="note">A laptop can’t receive drone radio; this replays recorded 2.4 GHz captures.</p>
+    </section>
+
+    <section class="tile">
+      <div class="top"><i class="dot on" id="model-dot"></i><span class="name">MODEL</span><span class="kind" id="model-version">—</span></div>
+      <div class="lbl">Operator labels</div>
+      <div class="state idle" id="model-labels">None yet</div>
+      <div class="row"><button class="btn primary" id="retrain" disabled>Retrain</button><button class="btn" id="rollback" disabled>Roll back</button></div>
+      <p class="note" id="model-note">Label incidents to teach the detector. A retrained model replaces the current one only if it passes the held-out benchmark.</p>
+    </section>
+  </aside>
+
+  <!-- center -->
+  <main class="center">
+    <section>
+      <div class="head"><span class="lbl">Site 01 · Sensor coverage</span><span class="lbl" id="map-note"></span></div>
+      <div class="map">
+        <svg viewBox="0 0 640 340" preserveAspectRatio="xMidYMid meet" aria-label="Site map">
+          <g class="grid" id="grid"></g>
+          <path class="perimeter" d="M70 60 L540 40 L590 210 L500 300 L120 290 L60 180 Z"/>
+          <rect class="bldg" x="150" y="96" width="74" height="46" rx="2"/>
+          <rect class="bldg" x="420" y="210" width="62" height="52" rx="2"/>
+          <rect class="bldg" x="236" y="226" width="40" height="32" rx="2"/>
+          <circle class="cov-r" cx="330" cy="170" r="150"/>
+          <circle class="cov-a" cx="330" cy="170" r="88"/>
+          <path class="node" d="M330 158 l10.4 6 v12 l-10.4 6 l-10.4 -6 v-12 Z"/>
+          <circle cx="330" cy="170" r="2.5" fill="currentColor" style="color:var(--tone)"/>
+          <text x="346" y="196">S1</text>
+          <text x="330" y="74" text-anchor="middle">ACOUSTIC</text>
+          <text x="330" y="14" text-anchor="middle" style="fill:var(--radio)">RADIO</text>
+          <text class="contact" x="330" y="290" text-anchor="middle">CONTACT · BEARING UNRESOLVED</text>
+          <g transform="translate(600 300)"><path d="M0 -16 L5 0 L0 -4 L-5 0 Z" fill="currentColor" style="color:var(--ink-3)"/><text x="0" y="12" text-anchor="middle">N</text></g>
+        </svg>
       </div>
-      <div class="spec radio"><canvas id="rfspec"></canvas><div class="idle label">Off</div></div>
     </section>
 
-    <section class="panel">
-      <header><span class="label">Detections</span></header>
-      <ol class="log" id="log"><li class="none label">None</li></ol>
+    <section>
+      <div class="spectra">
+        <div>
+          <div class="head"><span class="lbl">Acoustic spectrum</span><span class="lbl" id="raw-note"></span></div>
+          <div class="spec raw"><canvas id="spec"></canvas><div class="idle lbl">No input</div></div>
+        </div>
+      </div>
     </section>
-  </div>
-</main>
+
+    <section>
+      <div class="timeline">
+        <span class="lbl">Acoustic</span><div class="track" id="tl-ac"></div>
+        <span class="lbl">Radio</span><div class="track" id="tl-rf"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- incidents -->
+  <aside class="col">
+    <div class="head"><span class="lbl">Incidents</span>
+      <span class="row" style="gap:6px"><button class="btn" id="review-all">Review all</button><button class="btn" id="export">Export</button></span>
+    </div>
+    <ol class="incidents" id="incidents"></ol>
+    <p class="empty lbl" id="no-inc">No incidents</p>
+  </aside>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
 const body = document.body;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const utc = d => d.toISOString().slice(11, 19);
 
-// ---------- clock ----------
-const tick = () => { $("clock").textContent = new Date().toISOString().slice(11, 19) + " UTC"; };
+// ---------- static decoration ----------
+(() => {
+  const g = $("grid"); let h = "";
+  for (let x = 0; x <= 640; x += 40) h += `<line x1="${x}" y1="0" x2="${x}" y2="340"/>`;
+  for (let y = 0; y <= 340; y += 40) h += `<line x1="0" y1="${y}" x2="640" y2="${y}"/>`;
+  g.innerHTML = h;
+  $("meter").innerHTML = "<i></i>".repeat(24);
+  for (const id of ["tl-ac", "tl-rf"]) $(id).innerHTML = "<i></i>".repeat(120);
+})();
+const tick = () => { $("clock").textContent = utc(new Date()) + " UTC"; };
 tick(); setInterval(tick, 1000);
 
 // ---------- state ----------
-// audio is the primary channel; radio is secondary. The headline shows the more
-// serious of the two, and the tags say which channel(s) are calling it.
 let audioV = "idle", audioU = false, radioV = "idle", radioU = false;
 const RANK = { idle: 0, clear: 1, maybe: 2, drone: 3 };
-const HEAD = { idle: "Standby", clear: "Clear", maybe: "Possible drone", drone: "Drone detected" };
-let shown = "";
+const WORD = { idle: "Listening", clear: "Clear", maybe: "Possible drone", drone: "Drone" };
+
 function refresh(){
   const active = running || rfKey;
-  let v = !active ? "idle" : (RANK[audioV] >= RANK[radioV] ? audioV : radioV);
-  if (active && v === "idle") v = "clear";
+  const v = RANK[audioV] >= RANK[radioV] ? audioV : radioV;
+  const threat = !active ? "standby" : v === "drone" ? "alert" : v === "maybe" ? "caution" : "clear";
   const unknown = (audioV === "drone" && audioU) || (radioV === "drone" && radioU);
-  body.dataset.state = v; body.dataset.unknown = unknown ? "1" : "0";
-  const h = (v === "drone" && unknown) ? "Unknown drone" : HEAD[v];
-  if (h !== shown) { shown = h; const el = $("headline"); el.textContent = h; el.classList.remove("swap"); void el.offsetWidth; el.classList.add("swap"); }
-  const srcs = [];
-  if (audioV === "drone") srcs.push("Acoustic");
-  if (radioV === "drone") srcs.push("Radio");
-  $("tags").innerHTML = v === "drone" ? srcs.map(s => `<span class="chip tone">${s}</span>`).join("")
-    : (quiet && running && body.dataset.input === "mic" ? `<span class="chip">Low input level</span>` : "");
-  $("chip-audio").className = "chip " + (audioV === "drone" ? "hit" : running ? "live" : "");
-  $("chip-radio").className = "chip " + (radioV === "drone" ? "hit" : rfKey ? "live" : "");
-  if (!running) $("eyebrow").textContent = rfKey ? "Radio · " + rfName : "Acoustic detection";
-  $("audio-state").textContent = running ? { idle: "Listening", clear: "Clear", maybe: "Possible", drone: "Drone" }[audioV] : "";
-  $("radio-state").textContent = rfKey ? { idle: "Tuning", clear: "Clear", maybe: "Possible", drone: "Drone" }[radioV] : "Off";
-  if (v === "drone") openEpisode(srcs, unknown); else closeEpisode();
+  const srcs = [audioV === "drone" && "acoustic", radioV === "drone" && "radio"].filter(Boolean);
+  body.dataset.threat = threat; body.dataset.unknown = unknown ? "1" : "0"; body.dataset.src = srcs.join(" ");
+  $("threat").textContent = { standby: "STANDBY", clear: "CLEAR", caution: "CAUTION", alert: unknown ? "UNKNOWN UAS" : "UAS DETECTED" }[threat];
+
+  setState("ac-state", running ? audioV : "off", running ? WORD[audioV] : "Offline");
+  setState("rf-state", rfKey ? radioV : "off", rfKey ? WORD[radioV] : "Off");
+  dot("ac-dot", audioV === "drone" ? "hit" : running ? "on" : ""); dot("h-ac", $("ac-dot").className.split(" ")[1] || "");
+  dot("rf-dot", radioV === "drone" ? "hit" : rfKey ? "rf" : ""); dot("h-rf", $("rf-dot").className.split(" ")[1] || "");
+  $("map-note").textContent = threat === "alert" ? (unknown ? "Unknown UAS" : "UAS · " + srcs.join(" + ")) : "";
+
+  if (v === "drone") openIncident(srcs, unknown); else closeIncident();
 }
+function setState(id, cls, text){ const el = $(id); el.className = "state " + (cls === "off" ? "idle" : cls); el.textContent = text; }
+function dot(id, cls){ $(id).className = "dot " + cls; }
+
+// ---------- timeline ----------
+function pushTrack(id, cls){
+  const t = $(id); t.firstElementChild.remove();
+  const i = document.createElement("i"); if (cls) i.className = cls; t.append(i);
+}
+setInterval(() => {                                   // one cell per second
+  pushTrack("tl-ac", running ? audioV : "");
+  pushTrack("tl-rf", rfKey ? radioV : "");
+}, 1000);
 
 // ---------- socket ----------
 let ws = null, wsReady = false;
@@ -289,31 +340,32 @@ function connect(){
   ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
-    wsReady = true; $("chip-link").className = "chip live"; $("chip-link").lastChild.textContent = "Link";
+    wsReady = true; dot("link", "on");
     $("go").disabled = body.dataset.input === "file" && !fileBuf;
     if (running) ws.send(JSON.stringify({ type: "start", rate: ctx.sampleRate, input: body.dataset.input }));
     if (rfKey) ws.send(JSON.stringify({ type: "rf", source: rfKey }));
   };
-  ws.onclose = () => {
-    wsReady = false; $("chip-link").className = "chip hit"; $("chip-link").lastChild.textContent = "No link";
-    setTimeout(connect, 1500);
-  };
+  ws.onclose = () => { wsReady = false; dot("link", "hit"); setTimeout(connect, 1500); };
   ws.onmessage = ev => {
     const m = JSON.parse(ev.data);
-    if (m.type === "audio" && running) { audioV = m.verdict; audioU = m.unfamiliar; refresh(); }
-    if (m.type === "radio" && rfKey) { radioV = m.verdict; radioU = m.unfamiliar; drawRadio(m); refresh(); }
+    if (m.type === "audio" && running) {
+      audioV = m.verdict; audioU = m.unfamiliar;
+      refresh();
+    }
+    if (m.type === "radio" && rfKey) { radioV = m.verdict; radioU = m.unfamiliar; drawColumns(rfCanvas, [m.column], radioV === "drone", 6); refresh(); }
   };
 }
 connect();
 
-// ---------- audio ----------
+// ---------- audio capture ----------
 const TAP = `class Tap extends AudioWorkletProcessor{
   constructor(){ super(); this.buf = new Float32Array(4096); this.n = 0; }
   process(inputs){ const ch = inputs[0][0]; if (ch){ for (let i = 0; i < ch.length; i++){ this.buf[this.n++] = ch[i];
     if (this.n === this.buf.length){ this.port.postMessage(this.buf.slice(0)); this.n = 0; } } } return true; } }
   registerProcessor("tap", Tap);`;
 let ctx = null, tap = null, analyser = null, source = null, stream = null, running = false;
-let fileBuf = null, fileName = "", startedAt = 0, quiet = false;
+let fileBuf = null, fileName = "", startedAt = 0;
+let history = [];                                     // recent raw chunks, for incident playback
 
 async function ensureAudio(){
   if (ctx) { if (ctx.state === "suspended") await ctx.resume(); return; }
@@ -321,7 +373,12 @@ async function ensureAudio(){
   await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: "application/javascript" })));
   tap = new AudioWorkletNode(ctx, "tap");
   const mute = ctx.createGain(); mute.gain.value = 0; tap.connect(mute).connect(ctx.destination);
-  tap.port.onmessage = e => { if (running && wsReady) ws.send(e.data.buffer); };
+  tap.port.onmessage = e => {
+    if (!running) return;
+    history.push({ t: ctx.currentTime, x: e.data });
+    const keep = 30 * ctx.sampleRate / 4096; if (history.length > keep) history.splice(0, history.length - keep);
+    if (wsReady) ws.send(e.data.buffer.slice(0));
+  };
   analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.55;
 }
 
@@ -330,8 +387,7 @@ async function start(){
   const input = body.dataset.input;
   try {
     if (input === "mic") {
-      // voice processing would filter out rotor hum
-      stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: {   // voice processing would remove rotor hum
         echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
       source = ctx.createMediaStreamSource(stream);
     } else {
@@ -340,29 +396,24 @@ async function start(){
       source.connect(ctx.destination);
       source.onended = () => { if (running) stop(); };
     }
-  } catch (e) {
-    $("tags").innerHTML = `<span class="chip hit">Microphone blocked</span>`; return;
-  }
+  } catch (e) { setState("ac-state", "maybe", "Mic blocked"); return; }
   source.connect(analyser); source.connect(tap);
   ws.send(JSON.stringify({ type: "start", rate: ctx.sampleRate, input }));
-  running = true; startedAt = ctx.currentTime; audioV = "idle"; audioU = false;
+  running = true; startedAt = ctx.currentTime; audioV = "idle"; audioU = false; history = [];
   body.classList.add("running", "used");
   if (input === "file") source.start();
-  $("eyebrow").textContent = input === "mic" ? "Acoustic · microphone" : "Acoustic · " + fileName;
-  $("go").textContent = "Stop"; refresh();
+  $("go").textContent = "Stop"; $("missed").disabled = false; refresh();
 }
-
 function stop(){
   running = false; body.classList.remove("running");
   if (wsReady) ws.send(JSON.stringify({ type: "stop" }));
   try { if (source) { source.disconnect(); if (source.stop) source.stop(); } } catch (e) {}
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  source = null; audioV = "idle"; audioU = false; quiet = false;
-  $("eyebrow").textContent = "Acoustic detection"; $("go").textContent = "Start"; refresh();
+  source = null; audioV = "idle"; audioU = false;
+  $("go").textContent = "Start"; $("missed").disabled = true; refresh();
 }
-
 $("go").onclick = () => running ? stop() : start();
-addEventListener("keydown", e => {                       // space: start / stop
+addEventListener("keydown", e => {
   if (e.code !== "Space" || e.repeat || /^(INPUT|SELECT|BUTTON)$/.test(document.activeElement.tagName)) return;
   e.preventDefault(); if (!$("go").disabled) $("go").click();
 });
@@ -378,8 +429,7 @@ async function loadFile(f){
   $("drop-text").textContent = "Opening…";
   try {
     fileBuf = await ctx.decodeAudioData(await f.arrayBuffer());
-    fileName = f.name.replace(/\.[^.]+$/, "");
-    $("drop-text").textContent = fileName; $("go").disabled = !wsReady;
+    fileName = f.name.replace(/\.[^.]+$/, ""); $("drop-text").textContent = fileName; $("go").disabled = !wsReady;
   } catch (e) { fileBuf = null; $("go").disabled = true; $("drop-text").textContent = "Unsupported file"; }
 }
 $("file").onchange = e => loadFile(e.target.files[0]);
@@ -388,13 +438,13 @@ const drop = $("drop");
 ["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
 drop.addEventListener("drop", e => loadFile(e.dataTransfer.files[0]));
 
-// ---------- radio (secondary) ----------
+// ---------- radio ----------
 let rfKey = "", rfName = "";
 fetch("/rf/scenes").then(r => r.json()).then(list => {
   const sel = $("rf-src");
   if (!list.length) { sel.options[0].textContent = "Unavailable"; sel.disabled = true; return; }
-  for (const [g, name] of [["Drone", "Drone"], ["No drone", "No drone"]]) {
-    const og = document.createElement("optgroup"); og.label = name;
+  for (const g of ["Drone", "No drone"]) {
+    const og = document.createElement("optgroup"); og.label = g;
     list.filter(x => x.group === g).forEach(x => og.append(new Option(x.name, x.key)));
     sel.append(og);
   }
@@ -402,91 +452,193 @@ fetch("/rf/scenes").then(r => r.json()).then(list => {
 $("rf-src").onchange = e => {
   rfKey = e.target.value; rfName = rfKey ? e.target.selectedOptions[0].textContent : "";
   body.classList.toggle("rfon", !!rfKey);
-  radioV = "idle"; radioU = false;
-  rfCtx.clearRect(0, 0, rfCanvas.width, rfCanvas.height);
+  radioV = "idle"; radioU = false; rfCtx.clearRect(0, 0, rfCanvas.width, rfCanvas.height);
   if (wsReady) ws.send(JSON.stringify({ type: "rf", source: rfKey || null }));
   refresh();
 };
-const rfCanvas = $("rfspec"), rfCtx = rfCanvas.getContext("2d");
-function drawRadio(m){
-  const W = rfCanvas.width, H = rfCanvas.height, step = Math.round(8 * (devicePixelRatio || 1));
-  rfCtx.globalCompositeOperation = "copy"; rfCtx.drawImage(rfCanvas, -step, 0);
-  rfCtx.globalCompositeOperation = "source-over";
-  rfCtx.fillStyle = getComputedStyle(body).getPropertyValue(m.verdict === "drone" ? "--alert" : "--ink").trim();
-  const n = m.column.length, rowH = H / n;
-  m.column.forEach((v, i) => {
-    const a = Math.pow(v / 255, 1.5) * 0.85;
-    if (a > 0.03) { rfCtx.globalAlpha = a; rfCtx.fillRect(W - step, H - (i + 1) * rowH, step, Math.ceil(rowH)); }
-  });
-  rfCtx.globalAlpha = 1;
-}
 
-// ---------- detections + flag ----------
-let flags = [];
-try { flags = JSON.parse(localStorage.getItem("drona-flags-v2") || "[]"); } catch (e) { flags = []; }
-const saveFlags = () => { try { localStorage.setItem("drona-flags-v2", JSON.stringify(flags)); } catch (e) {} };
-const hhmm = d => d.toISOString().slice(11, 19) + " UTC";
-function showFlags(){
-  const open = flags.filter(f => !f.reviewed);
-  $("flag").classList.toggle("on", open.length > 0);
-  document.title = open.length ? "⚑ Drone detected · Drona" : "Drona";
-  if (!open.length) return;
-  const f = open[open.length - 1];
-  $("flag-text").innerHTML = `${f.unknown ? "Unknown drone" : "Drone detected"} · ${esc(f.time)}
-    <span>${f.via ? "· " + esc(f.via) : ""}${open.length > 1 ? ` · ${open.length - 1} more unreviewed` : ""}</span>`;
+// ---------- incidents ----------
+let incidents = [], incident = null, seq = 0, playing = null;
+function stopPlayback(){
+  if (!playing) return;
+  const { node } = playing; playing = null;
+  try { node.onended = null; node.stop(); } catch (e) {}
 }
-$("flag-ok").onclick = () => { flags.forEach(f => f.reviewed = true); saveFlags(); showFlags(); renderEpisode(); document.querySelectorAll(".log .f").forEach(e => e.remove()); };
-showFlags();
+try { const s = JSON.parse(localStorage.getItem("drona-incidents") || "{}"); incidents = s.list || []; seq = s.seq || 0; } catch (e) {}
+incidents.forEach(i => { if (!i.end) i.end = i.start; });   // closed when the page was left
+const save = () => { try { localStorage.setItem("drona-incidents", JSON.stringify({ seq, list: incidents.map(({ audio, ...r }) => r) })); } catch (e) {} };
 
-let episode = null;
-function sourceName(){ return running ? (body.dataset.input === "mic" ? "Microphone" : fileName) : rfName; }
-function openEpisode(srcs, unknown){
-  if (!episode) {
-    episode = { start: new Date(), srcs: new Set(), unknown, from: sourceName() };
-    $("log").querySelector(".none")?.remove();
-    episode.el = document.createElement("li"); $("log").prepend(episode.el);
-    episode.flag = { time: hhmm(episode.start), via: "", unknown, reviewed: false };
-    flags.push(episode.flag); flags = flags.slice(-50);
+function sourceLabel(){ return running ? (body.dataset.input === "mic" ? "Microphone" : fileName) : rfName; }
+function openIncident(srcs, unknown){
+  if (!incident) {
+    seq += 1;
+    incident = { id: `INC-${String(seq).padStart(4, "0")}`, start: new Date().toISOString(), end: null,
+                 sources: [], unknown, input: sourceLabel(), reviewed: false,
+                 t0: ctx ? ctx.currentTime - 2 : null, audible: running };
+    incidents.unshift(incident);
   }
-  srcs.forEach(s => episode.srcs.add(s));
-  episode.unknown ||= unknown;
-  episode.flag.unknown = episode.unknown;
-  episode.flag.via = [...episode.srcs].join(" + ") + " · " + episode.from;
-  saveFlags(); showFlags(); renderEpisode();
+  for (const s of srcs) if (!incident.sources.includes(s)) incident.sources.push(s);
+  incident.unknown ||= unknown;
+  save(); renderIncidents();
 }
-function closeEpisode(){ if (!episode) return; episode.end = new Date(); renderEpisode(); episode = null; }
-function dur(ms){ const s = ms / 1000; return s < 4 ? "brief" : s < 20 ? "seconds" : s < 60 ? "under a minute" : "over a minute"; }
-function renderEpisode(){
-  const e = episode; if (!e) return;
-  e.el.className = (e.unknown ? "unknown " : "") + (e.end ? "" : "now");
-  e.el.innerHTML = `<i></i><div><b>${e.unknown ? "Unknown drone" : "Drone"}</b>${e.flag.reviewed ? "" : `<span class="f">FLAGGED</span>`}
-    <small>${esc([...e.srcs].join(" + "))} · ${esc(e.from)}${e.end ? " · " + dur(e.end - e.start) : ""}</small></div>
-    <time>${e.end ? hhmm(e.start).slice(0, 5) : "LIVE"}</time>`;
+function closeIncident(){
+  if (!incident) return;
+  incident.end = new Date().toISOString();
+  if (incident.audible && ctx && history.length) incident.audio = clip(incident.t0, ctx.currentTime);
+  const done = incident; incident = null; save(); renderIncidents(); return done;
+}
+function clip(t0, t1){                                // raw audio around the incident, max 20 s
+  const sr = ctx.sampleRate, parts = history.filter(h => h.t >= t0 && h.t <= t1 + 0.1).map(h => h.x);
+  let n = parts.reduce((a, p) => a + p.length, 0); if (!n) return null;
+  n = Math.min(n, 20 * sr);
+  const buf = ctx.createBuffer(1, n, sr), out = buf.getChannelData(0);
+  let o = 0; for (const p of parts) { if (o >= n) break; out.set(p.subarray(0, n - o), o); o += p.length; }
+  return buf;
+}
+function dur(a, b){ const s = (new Date(b) - new Date(a)) / 1000; return s < 5 ? "Brief" : s < 60 ? `${Math.round(s)} s` : `${Math.round(s / 60)} min`; }
+function renderIncidents(){
+  $("no-inc").style.display = incidents.length ? "none" : "";
+  const open = incidents.filter(i => !i.reviewed).length;
+  $("open-count").textContent = open ? `${open} open` : "";
+  document.title = open ? `(${open}) Drona` : "Drona";
+  $("incidents").innerHTML = incidents.slice(0, 60).map(i => `
+    <li class="inc ${i.reviewed ? "" : "open"} ${i.end ? "" : "live"}" data-id="${i.id}">
+      <div class="t"><span class="id">${i.id}</span><span class="when">${utc(new Date(i.start))} UTC${i.end ? " · " + dur(i.start, i.end) : " · live"}</span></div>
+      <div class="what"><b>${i.unknown ? "Unknown UAS" : "UAS"}</b><small>${esc(i.input || "")}</small></div>
+      <div class="chips">
+        ${i.sources.includes("acoustic") ? `<span class="chip ac">Acoustic</span>` : ""}
+        ${i.sources.includes("radio") ? `<span class="chip rf">Radio</span>` : ""}
+        <span class="chip st ${i.label ? "ok" : i.reviewed ? "done" : ""}">${
+          i.label === "drone" ? (i.missed ? "Reported missed" : "Confirmed drone") : i.label === "not_drone" ? "False alarm"
+          : i.reviewed ? "Reviewed" : "Open"}</span>
+      </div>
+      <div class="acts">
+        ${i.audio ? `<button class="btn" data-play="${i.id}">${playing && playing.id === i.id ? "Stop" : "Play"}</button>` : ""}
+        ${i.reviewed ? "" : i.audio
+          ? `<button class="btn" data-label="drone" data-id="${i.id}">Confirm drone</button><button class="btn" data-label="not_drone" data-id="${i.id}">False alarm</button>`
+          : `<button class="btn" data-review="${i.id}">Mark reviewed</button>`}
+      </div>
+    </li>`).join("");
+}
+$("incidents").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const inc = incidents.find(i => i.id === (b.dataset.play || b.dataset.review || b.dataset.id)); if (!inc) return;
+  if (b.dataset.label && inc.audio) {
+    b.disabled = true;
+    const confirmed = b.dataset.label === "drone";
+    const buf = confirmed && inc.audio.duration > 3 ? trim(inc.audio, 2) : inc.audio;   // drop the pre-roll
+    sendClip(inc.id, b.dataset.label, buf, inc.input).then(ok => {
+      if (ok) { inc.label = b.dataset.label; inc.reviewed = true; save(); }
+      renderIncidents();
+    });
+    return;
+  }
+  if (b.dataset.review) { inc.reviewed = true; save(); renderIncidents(); }
+  if (b.dataset.play && inc.audio) {
+    const again = playing && playing.id === inc.id;
+    stopPlayback();
+    if (!again) {
+      const node = ctx.createBufferSource(); node.buffer = inc.audio; node.connect(ctx.destination);
+      node.onended = () => { if (playing && playing.node === node) { playing = null; renderIncidents(); } };
+      playing = { id: inc.id, node }; node.start();
+    }
+    renderIncidents();
+  }
+};
+$("review-all").onclick = () => { incidents.forEach(i => { if (i.end) i.reviewed = true; }); save(); renderIncidents(); };
+$("export").onclick = () => {
+  const rows = [["id", "start_utc", "end_utc", "type", "sources", "input", "reviewed", "label"],
+    ...incidents.map(i => [i.id, i.start, i.end || "", i.unknown ? "unknown UAS" : "UAS", i.sources.join("+"),
+                           i.input || "", i.reviewed ? "yes" : "no", i.label || ""])];
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `drona-incidents-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+};
+renderIncidents();
+
+// ---------- feedback and retraining ----------
+function trim(buf, seconds){
+  const skip = Math.round(seconds * buf.sampleRate), out = ctx.createBuffer(1, buf.length - skip, buf.sampleRate);
+  out.getChannelData(0).set(buf.getChannelData(0).subarray(skip)); return out;
+}
+async function sendClip(id, label, buf, input){
+  try {
+    const q = new URLSearchParams({ id, label, rate: buf.sampleRate, input: input || "" });
+    const r = await fetch("/feedback?" + q, { method: "POST", body: buf.getChannelData(0).slice().buffer });
+    const j = await r.json(); if (j.model) showModel(j.model); return !!j.ok;
+  } catch (e) { return false; }
+}
+$("missed").onclick = async () => {
+  const buf = ctx && clip(ctx.currentTime - 8, ctx.currentTime); if (!buf) return;
+  seq += 1;
+  const inc = { id: `MISS-${String(seq).padStart(4, "0")}`, start: new Date(Date.now() - buf.duration * 1000).toISOString(),
+                end: new Date().toISOString(), sources: ["acoustic"], unknown: false, input: sourceLabel(),
+                reviewed: true, label: "drone", missed: true, audio: buf };
+  incidents.unshift(inc); save(); renderIncidents();
+  $("missed").disabled = true; $("missed").textContent = "Saved";
+  const ok = await sendClip(inc.id, "drone", buf, inc.input);
+  setTimeout(() => { $("missed").textContent = "Report missed drone"; $("missed").disabled = !running; }, 1500);
+  if (!ok) { $("missed").textContent = "Not saved"; }
+};
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+function showModel(m){
+  $("model-version").textContent = m.version;
+  const d = m.labelled.drone, f = m.labelled.not_drone;
+  $("model-labels").textContent = d + f ? `${plural(d, "drone")} · ${plural(f, "false alarm")}` : "None yet";
+  $("model-labels").className = "state " + (d + f ? "" : "idle");
+  $("retrain").disabled = !(d + f);
+  $("rollback").disabled = !m.version.startsWith("v") || m.version.startsWith("v0");
+  const last = m.last;
+  $("model-note").textContent = !last ? "Label incidents to teach the detector. A retrained model replaces the current one only if it passes the held-out benchmark."
+    : (last.promoted ? `${last.version} is live. ` : "Kept the current model. ") + last.reason
+      + (m.new ? ` ${plural(m.new, "new label")} since.` : "");
+}
+fetch("/model").then(r => r.json()).then(showModel).catch(() => {});
+$("retrain").onclick = async () => {
+  $("retrain").disabled = true; $("retrain").textContent = "Retraining…";
+  $("model-note").textContent = "Building a new model and testing it against the held-out benchmark…";
+  try { const j = await (await fetch("/retrain", { method: "POST" })).json(); if (j.model) showModel(j.model); else $("model-note").textContent = j.error || "Retrain failed."; }
+  catch (e) { $("model-note").textContent = "Retrain failed."; }
+  $("retrain").textContent = "Retrain";
+};
+$("rollback").onclick = async () => {
+  try { const j = await (await fetch("/rollback", { method: "POST" })).json(); if (j.model) showModel(j.model); } catch (e) {}
+};
+
+// ---------- spectra ----------
+const spec = $("spec"), sctx = spec.getContext("2d");
+const rfCanvas = $("rfspec"), rfCtx = rfCanvas.getContext("2d");
+function fit(c){ const r = c.getBoundingClientRect(), d = devicePixelRatio || 1; c.width = Math.max(1, r.width * d); c.height = Math.max(1, r.height * d); }
+const fitAll = () => [spec, rfCanvas].forEach(fit);
+addEventListener("resize", fitAll); fitAll();
+const css = v => getComputedStyle(body).getPropertyValue(v).trim();
+
+function drawColumns(canvas, cols, hot, colW){         // columns of 0-255, low pitch first
+  const c = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
+  const w = colW ? Math.round(colW * (devicePixelRatio || 1)) : Math.max(1, Math.round(W / 300));
+  const step = w * cols.length;
+  c.globalCompositeOperation = "copy"; c.drawImage(canvas, -step, 0); c.globalCompositeOperation = "source-over";
+  c.fillStyle = css(hot ? "--alert" : "--ink");
+  cols.forEach((col, k) => {
+    const n = col.length, rowH = H / n, x = W - step + k * w;
+    col.forEach((v, i) => { const a = Math.pow(v / 255, 1.5) * 0.9; if (a > 0.03) { c.globalAlpha = a; c.fillRect(x, H - (i + 1) * rowH, w, Math.ceil(rowH)); } });
+  });
+  c.globalAlpha = 1;
 }
 
-// ---------- acoustic spectrum + level ----------
-const spec = $("spec"), sctx = spec.getContext("2d");
-function fit(c){ const r = c.getBoundingClientRect(), d = devicePixelRatio || 1; c.width = r.width * d; c.height = r.height * d; }
-const fitAll = () => { fit(spec); fit(rfCanvas); };
-addEventListener("resize", fitAll); fitAll();
-let freq = null, wave = null, level = 0, quietFor = 0, lastT = performance.now();
-function draw(t){
-  const dt = (t - lastT) / 1000; lastT = t;
+let freq = null, wave = null, level = 0;
+function draw(){
   if (running && analyser) {
-    freq ||= new Uint8Array(analyser.frequencyBinCount);
-    wave ||= new Float32Array(analyser.fftSize);
+    freq ||= new Uint8Array(analyser.frequencyBinCount); wave ||= new Float32Array(analyser.fftSize);
     analyser.getByteFrequencyData(freq); analyser.getFloatTimeDomainData(wave);
     let ss = 0; for (const v of wave) ss += v * v;
-    const rms = Math.sqrt(ss / wave.length);
-    level += (Math.min(1, rms * 9) - level) * 0.25;
-    quietFor = rms < 0.004 ? quietFor + dt : 0;
-    const q = quietFor > 3; if (q !== quiet) { quiet = q; refresh(); }
+    level += (Math.min(1, Math.sqrt(ss / wave.length) * 9) - level) * 0.3;
 
     const W = spec.width, H = spec.height, step = Math.max(2, Math.round((devicePixelRatio || 1) * 2));
-    sctx.globalCompositeOperation = "copy"; sctx.drawImage(spec, -step, 0);
-    sctx.globalCompositeOperation = "source-over";
+    sctx.globalCompositeOperation = "copy"; sctx.drawImage(spec, -step, 0); sctx.globalCompositeOperation = "source-over";
     const maxBin = Math.floor(8000 / (ctx.sampleRate / 2) * freq.length);
-    sctx.fillStyle = getComputedStyle(body).getPropertyValue(audioV === "drone" ? "--alert" : "--ink").trim();
+    sctx.fillStyle = css(audioV === "drone" ? "--alert" : "--ink");
     const col = Array.from(freq.subarray(0, maxBin)).sort((a, b) => a - b);
     const floor = col[Math.floor(col.length * 0.5)], top = Math.max(floor + 40, col[col.length - 1]);
     for (let y = 0; y < H; y++) {
@@ -497,8 +649,9 @@ function draw(t){
     sctx.globalAlpha = 1;
     if (body.dataset.input === "file" && source && source.buffer)
       $("progress").style.transform = `scaleX(${Math.min(1, (ctx.currentTime - startedAt) / source.buffer.duration)})`;
-  } else level *= 0.9;
-  $("ring").style.setProperty("--level", level.toFixed(3));
+  } else level *= 0.85;
+  const lit = Math.round(level * 24);
+  [...$("meter").children].forEach((el, i) => el.className = i < lit ? (i >= 19 ? "on hot" : "on") : "");
   requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);

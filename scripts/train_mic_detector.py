@@ -101,6 +101,8 @@ def main() -> int:
     aug_idx = []
     for split, n_bg in BG_PER_SPLIT.items():
         s = df[df.split_tier4 == split]
+        if split == "val":             # indoor validation clips are the evaluation set below
+            s = s[s.source != "droneaudio"]
         aug_idx += list(s[s.y == 1].index)
         aug_idx += list(s[s.y == 0].sample(min(n_bg, (s.y == 0).sum()), random_state=1).index)
     base = df.loc[aug_idx]
@@ -121,10 +123,12 @@ def main() -> int:
     # --- test: held-out clean, and held-out through the channel ------------
     test = {}
     rng_t = np.random.default_rng(99)
-    t1 = df[df.split_tier1 == "test"]
+    # tier-1 test is tier-4 training data; indoor validation is the only indoor
+    # audio the detector weights never saw (it does set the threshold)
+    t1 = df[(df.split_tier4 == "val") & (df.source == "droneaudio")]
     t1 = pd.concat([t1[t1.y == 1], t1[t1.y == 0].sample(600, random_state=2)])
     sv = df[(df.split_tier4 == "test")]
-    for name, rows_t in (("indoor held-out", t1), ("outdoor held-out (Svanström)", sv)):
+    for name, rows_t in (("indoor validation", t1), ("outdoor held-out (Svanström)", sv)):
         y = rows_t.y.values
         Fc = F[rows_t.index.values]
         Fm = embed(enc, [speaker_mic(c, rng_t) for c in clips_for(rows_t)])
@@ -143,7 +147,8 @@ def main() -> int:
           "`scripts/train_mic_detector.py` adds simulated speaker -> room -> microphone copies "
           f"x{COPIES} of each training clip ({len(rows)} copies; all drones, a sample of backgrounds) and "
           "rebuilds the same tier-4 detector (same split, source balancing, 1% false alarms on "
-          "validation negatives, uncertainty flags). Test clips get their own channel copies.", "",
+          "validation negatives, uncertainty flags). Test clips get their own channel copies. Indoor rows "
+          "use validation recordings: the tier-1 test split is tier-4 training data, so it cannot be used.", "",
           "| test set | input | drone recall before | after | false alarms before | after |",
           "|---|---|---|---|---|---|"]
     for name, r in test.items():

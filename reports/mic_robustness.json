@@ -1,24 +1,24 @@
 {
-  "augmented_clips": 28269,
+  "augmented_clips": 26358,
   "test": {
-    "indoor held-out": {
+    "indoor validation": {
       "clean": {
         "before": {
-          "drone_recall": 0.7836734693877551,
+          "drone_recall": 0.7165775401069518,
           "false_alarm_rate": 0.0
         },
         "after": {
-          "drone_recall": 0.636734693877551,
-          "false_alarm_rate": 0.0
+          "drone_recall": 0.5935828877005348,
+          "false_alarm_rate": 0.011666666666666667
         }
       },
       "through speaker + mic": {
         "before": {
-          "drone_recall": 0.44081632653061226,
-          "false_alarm_rate": 0.006666666666666667
+          "drone_recall": 0.45454545454545453,
+          "false_alarm_rate": 0.0016666666666666668
         },
         "after": {
-          "drone_recall": 0.6081632653061224,
+          "drone_recall": 0.6096256684491979,
           "false_alarm_rate": 0.0033333333333333335
         }
       }
@@ -30,8 +30,8 @@
           "false_alarm_rate": 0.0016666666666666668
         },
         "after": {
-          "drone_recall": 0.12666666666666668,
-          "false_alarm_rate": 0.0
+          "drone_recall": 0.14333333333333334,
+          "false_alarm_rate": 0.0033333333333333335
         }
       },
       "through speaker + mic": {
@@ -40,8 +40,8 @@
           "false_alarm_rate": 0.005
         },
         "after": {
-          "drone_recall": 0.12333333333333334,
-          "false_alarm_rate": 0.0016666666666666668
+          "drone_recall": 0.11666666666666667,
+          "false_alarm_rate": 0.008333333333333333
         }
       }
     }

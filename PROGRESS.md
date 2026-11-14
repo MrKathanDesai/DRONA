@@ -31,9 +31,13 @@ Combined work from branches `001-vidhi` (Vidhi) and `002` (Kathan).
 - **DroneDetect subset:** Vidhi; 2-model classification only, no background (`dronedetect_subset.md`).
 - **Uncertainty / unknown-drone flags and which-drone confusion matrices:** Kathan.
 
+## Music masking
+- Benchmark of drones under real music (-10 to +10 dB), a stationary-component
+  front-end (negative result) and a music-aware detector (works; experiment only): Kathan (`masking.md`).
+
 ## Live page
-- `python -m console`: acoustic detection from the microphone or a file, with a
-  recorded-radio panel judged separately, and flags that persist until reviewed: Kathan.
+- `python -m console`: operations console with acoustic sensor, music-masking
+  monitor, recorded-radio sensor, site map, timeline and incident queue: Kathan.
 - Alarm rule calibrated on validation recordings (`live_calibration.md`).
 - Opt-in detector trained on simulated speaker -> microphone playback (`mic_robustness.md`).
 
@@ -44,9 +48,18 @@ Combined work from branches `001-vidhi` (Vidhi) and `002` (Kathan).
   and the fusion results merged in. `streamlit run app/dashboard.py`.
 
 ## Tests
-- 130 passing (`python -m pytest -q`).
+- 137 passing (`python -m pytest -q`).
+
+## Outdoor validation and learning loop
+- Outdoor aircraft (AeroSonicDB, held-out sessions): no alarms on 99 aircraft or
+  317 ambience recordings (`aircraft.md`): Kathan.
+- Operator-in-the-loop retraining with a champion/challenger gate, versions and
+  rollback (`src/dronedet/feedback.py`): Kathan.
 
 ## Still open
-- Real Wi-Fi / Bluetooth RF recordings (CardRF / DroneDetect need a login) to
-  measure RF false alarms on real traffic.
+- Independent RF validation: the KU Leuven Drone RF dataset (new receiver,
+  43.5 GB) needs a download request and shows no background recordings; CardRF
+  (with Wi-Fi / Bluetooth) needs an IEEE DataPort login.
+- Audio + RF fusion on paired data: no public dataset records both for the same
+  flight; the fusion ablation stays an upper bound.
 - Outdoor audio is weak for every model (recall ~0.2–0.45 at 1% false alarms).

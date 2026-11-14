@@ -1,0 +1,205 @@
+{
+  "snrs_db": [
+    10,
+    5,
+    0,
+    -5,
+    -10
+  ],
+  "results": {
+    "original detector": {
+      "clean": {
+        "window_rate": 0.6971428571428572,
+        "recording_rate": 0.8857142857142857,
+        "is_drone": true
+      },
+      "+10 dB": {
+        "window_rate": 0.6057142857142858,
+        "recording_rate": 0.8,
+        "is_drone": true
+      },
+      "+5 dB": {
+        "window_rate": 0.3942857142857143,
+        "recording_rate": 0.6571428571428571,
+        "is_drone": true
+      },
+      "+0 dB": {
+        "window_rate": 0.17142857142857143,
+        "recording_rate": 0.5142857142857142,
+        "is_drone": true
+      },
+      "-5 dB": {
+        "window_rate": 0.05142857142857143,
+        "recording_rate": 0.2571428571428571,
+        "is_drone": true
+      },
+      "-10 dB": {
+        "window_rate": 0.02857142857142857,
+        "recording_rate": 0.11428571428571428,
+        "is_drone": true
+      },
+      "music alone": {
+        "window_rate": 0.0033333333333333335,
+        "recording_rate": 0.016666666666666666,
+        "is_drone": false
+      },
+      "background": {
+        "window_rate": 0.0033333333333333335,
+        "recording_rate": 0.016666666666666666,
+        "is_drone": false
+      },
+      "background + music 0 dB": {
+        "window_rate": 0.02666666666666667,
+        "recording_rate": 0.05,
+        "is_drone": false
+      }
+    },
+    "music-aware detector": {
+      "clean": {
+        "window_rate": 0.6742857142857143,
+        "recording_rate": 0.8285714285714286,
+        "is_drone": true
+      },
+      "+10 dB": {
+        "window_rate": 0.6571428571428571,
+        "recording_rate": 0.8571428571428571,
+        "is_drone": true
+      },
+      "+5 dB": {
+        "window_rate": 0.5542857142857143,
+        "recording_rate": 0.8285714285714286,
+        "is_drone": true
+      },
+      "+0 dB": {
+        "window_rate": 0.4514285714285714,
+        "recording_rate": 0.9142857142857143,
+        "is_drone": true
+      },
+      "-5 dB": {
+        "window_rate": 0.21142857142857144,
+        "recording_rate": 0.5142857142857142,
+        "is_drone": true
+      },
+      "-10 dB": {
+        "window_rate": 0.08571428571428572,
+        "recording_rate": 0.2857142857142857,
+        "is_drone": true
+      },
+      "music alone": {
+        "window_rate": 0.0,
+        "recording_rate": 0.0,
+        "is_drone": false
+      },
+      "background": {
+        "window_rate": 0.0,
+        "recording_rate": 0.0,
+        "is_drone": false
+      },
+      "background + music 0 dB": {
+        "window_rate": 0.04666666666666667,
+        "recording_rate": 0.13333333333333333,
+        "is_drone": false
+      }
+    },
+    "original detector + stationary front-end": {
+      "clean": {
+        "window_rate": 0.12571428571428572,
+        "recording_rate": 0.2571428571428571,
+        "is_drone": true
+      },
+      "+10 dB": {
+        "window_rate": 0.10285714285714286,
+        "recording_rate": 0.22857142857142856,
+        "is_drone": true
+      },
+      "+5 dB": {
+        "window_rate": 0.14285714285714285,
+        "recording_rate": 0.3142857142857143,
+        "is_drone": true
+      },
+      "+0 dB": {
+        "window_rate": 0.06857142857142857,
+        "recording_rate": 0.17142857142857143,
+        "is_drone": true
+      },
+      "-5 dB": {
+        "window_rate": 0.17142857142857143,
+        "recording_rate": 0.45714285714285713,
+        "is_drone": true
+      },
+      "-10 dB": {
+        "window_rate": 0.2571428571428571,
+        "recording_rate": 0.6285714285714286,
+        "is_drone": true
+      },
+      "music alone": {
+        "window_rate": 0.2,
+        "recording_rate": 0.5166666666666667,
+        "is_drone": false
+      },
+      "background": {
+        "window_rate": 0.0,
+        "recording_rate": 0.0,
+        "is_drone": false
+      },
+      "background + music 0 dB": {
+        "window_rate": 0.1,
+        "recording_rate": 0.35,
+        "is_drone": false
+      }
+    },
+    "music-aware detector + stationary front-end": {
+      "clean": {
+        "window_rate": 0.09142857142857143,
+        "recording_rate": 0.17142857142857143,
+        "is_drone": true
+      },
+      "+10 dB": {
+        "window_rate": 0.08,
+        "recording_rate": 0.17142857142857143,
+        "is_drone": true
+      },
+      "+5 dB": {
+        "window_rate": 0.10285714285714286,
+        "recording_rate": 0.2571428571428571,
+        "is_drone": true
+      },
+      "+0 dB": {
+        "window_rate": 0.03428571428571429,
+        "recording_rate": 0.11428571428571428,
+        "is_drone": true
+      },
+      "-5 dB": {
+        "window_rate": 0.09142857142857143,
+        "recording_rate": 0.2857142857142857,
+        "is_drone": true
+      },
+      "-10 dB": {
+        "window_rate": 0.18857142857142858,
+        "recording_rate": 0.4,
+        "is_drone": true
+      },
+      "music alone": {
+        "window_rate": 0.11333333333333333,
+        "recording_rate": 0.35,
+        "is_drone": false
+      },
+      "background": {
+        "window_rate": 0.0033333333333333335,
+        "recording_rate": 0.016666666666666666,
+        "is_drone": false
+      },
+      "background + music 0 dB": {
+        "window_rate": 0.08,
+        "recording_rate": 0.2833333333333333,
+        "is_drone": false
+      }
+    }
+  },
+  "deploy_front_end": false,
+  "n": {
+    "drone_recordings": 35,
+    "background_recordings": 60,
+    "music_excerpts": 60
+  }
+}

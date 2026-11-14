@@ -5,7 +5,10 @@
 
 Acoustic (primary): the browser captures sound, from the microphone or an audio
 file it plays out loud, and streams raw samples here. Once per second the audio
-detector judges the last second. Nothing is recorded or stored.
+detector judges the last second. Sound is not stored, except the clips an
+operator labels (Confirm drone / False alarm / Report missed drone), which go to
+data/feedback/ and can retrain the detector behind a safety gate
+(src/dronedet/feedback.py).
 
 Radio (secondary): a laptop cannot receive raw 2.4 GHz signals (its Wi-Fi chip
 only hands over decoded Wi-Fi packets), so the radio panel replays recorded
@@ -36,7 +39,7 @@ for _p in (ROOT / "src", ROOT):
 
 import joblib
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from scipy.signal import resample_poly
 
@@ -86,18 +89,26 @@ def session() -> Session:
     return Session(**CALIBRATION)
 
 
+def _variant(base, path: Path):
+    """The live detector with another trained head (same encoder)."""
+    m = copy.copy(base)
+    m.det = joblib.load(path)
+    m.model, m.threshold = m.det.head, m.det.threshold
+    return m
+
+
 def detector(mic: bool = False):
-    """The deployed audio detector, or for the microphone with
-    DRONA_MIC_MODEL=speaker the playback-trained one. Both share one encoder."""
+    """The audio detector in use (the latest promoted version, if feedback has
+    produced one); for the microphone with DRONA_MIC_MODEL=speaker, the
+    playback-trained one."""
     if "det" not in _model:
+        from dronedet import feedback as FB
         from dronedet import live as L
-        _model["det"] = L.LiveDetector("detector")
-        path = L.MODELS / "detector_mic.joblib"
-        if path.exists():
-            m = copy.copy(_model["det"])
-            m.det = joblib.load(path)
-            m.model, m.threshold = m.det.head, m.det.threshold
-            _model["mic"] = m
+        base = L.LiveDetector("detector")
+        current = FB.current_model_path()
+        _model["det"] = _variant(base, current) if current != FB.ORIGINAL else base
+        if (L.MODELS / "detector_mic.joblib").exists():
+            _model["mic"] = _variant(_model["det"], L.MODELS / "detector_mic.joblib")
     if mic and os.environ.get("DRONA_MIC_MODEL") == "speaker":
         return _model.get("mic", _model["det"])
     return _model["det"]
@@ -107,8 +118,8 @@ def classify(window_16k: np.ndarray, mic: bool = False) -> str:
     """1 s of 16 kHz audio -> detector state."""
     det = detector(mic)
     with _lock:
-        df, _ = det.analyse(window_16k, 1.0)
-    return str(df.state.iloc[0])
+        emb, _ = det.enc([window_16k])
+        return str(det.det.assess(emb)["state"][0])
 
 
 def to_16k(x: np.ndarray, rate: int) -> np.ndarray:
@@ -188,6 +199,58 @@ def index():
 def health():
     return JSONResponse({"ok": "det" in _model, "radio": _model.get("rf") is not None,
                          "mic_model": os.environ.get("DRONA_MIC_MODEL", "original")})
+
+
+@app.get("/config")
+def config():
+    return JSONResponse({"alarm_rule": CALIBRATION})
+
+
+@app.post("/feedback")
+async def feedback(request: Request, id: str, label: str, rate: int, input: str = ""):
+    """A labelled clip from the incident queue: raw float32 samples at `rate`."""
+    from dronedet import feedback as FB
+    x = np.frombuffer(await request.body(), dtype=np.float32)
+    try:
+        row = await asyncio.to_thread(FB.save_clip, id, label, to_16k(x, rate), input)
+    except ValueError as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+    return JSONResponse({"ok": True, "clip": row, "model": FB.status()})
+
+
+@app.get("/model")
+def model_status():
+    from dronedet import feedback as FB
+    return JSONResponse(FB.status())
+
+
+_retrain_lock = asyncio.Lock()
+
+
+@app.post("/retrain")
+async def retrain():
+    from dronedet import feedback as FB
+    if _retrain_lock.locked():
+        return JSONResponse({"ok": False, "error": "already retraining"}, status_code=409)
+    async with _retrain_lock:
+        det = detector()
+        res = await asyncio.to_thread(FB.retrain, det.enc, det.det)
+        new = res.pop("model", None)
+        if new is not None:
+            with _lock:
+                det.det, det.model, det.threshold = new, new.head, new.threshold
+    return JSONResponse({"ok": True, "result": res, "model": FB.status()})
+
+
+@app.post("/rollback")
+async def rollback():
+    from dronedet import feedback as FB
+    FB.rollback()
+    det = detector()
+    m = joblib.load(FB.current_model_path())
+    with _lock:
+        det.det, det.model, det.threshold = m, m.head, m.threshold
+    return JSONResponse({"ok": True, "model": FB.status()})
 
 
 @app.get("/rf/scenes")

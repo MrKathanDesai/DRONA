@@ -36,6 +36,11 @@ streamlit run app/dashboard.py     # results and evaluation dashboard
 | 14 | Live detection page: microphone / file, recorded radio panel, flags | **done** — `python -m console` |
 | 14b | Live alarm rule calibrated on validation recordings | **done: alarm on the first drone window** — see `reports/live_calibration.md` |
 | 14c | Detector trained on simulated speaker -> microphone playback | **done, opt-in** — see `reports/mic_robustness.md` |
+| 15 | Music masking benchmark: drones under real music, -10 to +10 dB; stationary-component front-end (negative result) vs music-aware training | **done: music-aware training more than doubles detection at 0 and -5 dB** — see `reports/masking.md` |
+| 16 | Live page redesigned as an operations console: sensor tiles, site coverage map, activity timeline, incident queue with playback and CSV export | **done** — `python -m console` |
+| 18 | Outdoor aircraft validation on AeroSonicDB (ADS-B-labelled overflights, held-out recording sessions) | **done: 0 of 99 aircraft and 0 of 317 outdoor-ambience recordings raise an alarm** — see `reports/aircraft.md` |
+| 17 | Operator-in-the-loop learning: labelled incidents retrain the detector behind a champion/challenger safety gate, with versions and rollback | **done** — `src/dronedet/feedback.py`, `scripts/retrain_feedback.py` |
+| open | Independent RF validation with background recordings (KU Leuven / CardRF need a request or login) and paired audio + RF for fusion (no public co-recorded set found) | needs data |
 | next | Real Wi-Fi / Bluetooth recordings (CardRF / DroneDetect) to measure RF false alarms on real traffic | needs a DataPort / CardRF login |
 
 ## Setup
@@ -98,10 +103,7 @@ for real speech/music noise (1.6 GB) and the Tampere RF recordings (5.3 GB).
 See `data/README.md` for provenance. Long runs: keep the Mac awake
 (`caffeinate -i python scripts/train_deep.py`), or sleep stretches them to hours.
 
-## Live detection page
-
-`console/` is the live view: one dark screen, acoustic detection first, radio
-second. No metrics.
+## Live detection page (operations console)
 
 ```bash
 pip install -r console/requirements.txt
@@ -109,23 +111,29 @@ python -m console                       # http://localhost:8080
 python -m console --mic-model speaker   # mic uses the playback-trained detector
 ```
 
-- **Acoustic (primary):** microphone or an audio file (it plays out loud and is
-  checked as it plays). The browser's voice processing is switched off so rotor
-  hum is not filtered out.
-- **Radio (secondary):** a laptop cannot receive drone radio (its Wi-Fi chip
-  only hands over decoded Wi-Fi packets, not the raw 2.4 GHz spectrum), so the
-  panel replays recorded 2.4 GHz captures from the held-out test split, scored
-  by the deployed RF v2 detector. It is judged independently of the sound: the
-  replay has nothing to do with what the microphone hears, so the two are not
-  fused here (the fusion ablation is in `reports/fusion.md`). Live radio needs a
-  software-defined radio covering 2.4 GHz, such as a HackRF One or ADALM-Pluto.
-- The headline shows the more serious of the two channels and which one called
-  it. Every detection raises a flag that stays until someone marks it reviewed.
-- Alarm rule: one decision per second; "drone" on the first drone window, held
-  for three. Chosen on validation recordings by `scripts/calibrate_live.py`:
-  it alarms on 93% of validation drone recordings (57% of outdoor test drone
-  recordings, against 27% for a two-in-a-row rule) for 1.4% of background
-  recordings (`reports/live_calibration.md`).
+- **Acoustic sensor (primary):** microphone or an audio file (played out loud
+  and checked as it plays). Browser voice processing is off so rotor hum is
+  not filtered out. One decision per second; the alarm rule (first drone
+  window, held for three) was chosen on validation recordings
+  (`reports/live_calibration.md`).
+- **Radio sensor (secondary):** a laptop cannot receive drone radio (its Wi-Fi
+  chip only hands over decoded Wi-Fi packets), so this replays recorded
+  2.4 GHz captures from the held-out test split, scored by RF v2, judged
+  independently of the sound. Live radio needs a software-defined radio
+  covering 2.4 GHz (HackRF One, ADALM-Pluto).
+- **Site map, timeline, incidents:** sensor coverage lights up on contact
+  (the sensors are omnidirectional, so no bearing is shown); every detection
+  becomes an incident with its sources, audio playback and CSV export.
+- **Learning from the operator:** each incident with audio is labelled
+  *Confirm drone* or *False alarm*, and *Report missed drone* saves the last
+  8 s as a drone. Only labelled clips are stored (`data/feedback/`).
+  *Retrain* (Model panel, or `python scripts/retrain_feedback.py`) rebuilds
+  the detector head on the original training data plus every label, in
+  seconds, and promotes the new model only if it passes a gate: no more than
+  0.02 drone recall lost and no more false alarms on the outdoor held-out
+  benchmark, and at least as good on the labelled clips under
+  incident-grouped cross-validation. Every promoted model is versioned
+  (`data/models/versions/`, `registry.json`) and can be rolled back.
 
 Hosting: `python -m console --host 0.0.0.0`, or
 `docker build -t drona . && docker run -p 8080:8080 -v "$PWD/data:/app/data" drona`.

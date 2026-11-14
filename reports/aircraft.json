@@ -1,0 +1,52 @@
+{
+  "n": {
+    "test_aircraft_recordings": 99,
+    "test_silence_recordings": 317,
+    "train_negative_windows": 20009
+  },
+  "results": {
+    "original": {
+      "aerosonic_test": {
+        "aircraft": {
+          "windows": 1980,
+          "window_rate": 0.0,
+          "recordings": 99,
+          "recording_rate": 0.0
+        },
+        "outdoor silence": {
+          "windows": 3170,
+          "window_rate": 0.0,
+          "recordings": 317,
+          "recording_rate": 0.0
+        }
+      },
+      "svanstrom": {
+        "drone": 0.14666666666666667,
+        "helicopter": 0.0033333333333333335,
+        "outdoor_background": 0.0
+      }
+    },
+    "retrained": {
+      "aerosonic_test": {
+        "aircraft": {
+          "windows": 1980,
+          "window_rate": 0.0,
+          "recordings": 99,
+          "recording_rate": 0.0
+        },
+        "outdoor silence": {
+          "windows": 3170,
+          "window_rate": 0.0,
+          "recordings": 317,
+          "recording_rate": 0.0
+        }
+      },
+      "svanstrom": {
+        "drone": 0.16,
+        "helicopter": 0.006666666666666667,
+        "outdoor_background": 0.0
+      }
+    }
+  },
+  "deployed": false
+}
