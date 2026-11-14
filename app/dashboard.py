@@ -218,6 +218,14 @@ APP_CSS = """
 .gauge span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
 .gauge i { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 1px;
            background: currentColor; transform: translateX(-1px); }
+/* Transparent scrollbars everywhere: invisible track and thumb; a faint
+   thumb shows only while the pointer is over the scrolling area. */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: color-mix(in srgb, currentColor 22%, transparent) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 8px; }
+*:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, currentColor 22%, transparent); }
 /* Visible keyboard focus on everything a keyboard can reach. */
 a:focus-visible, button:focus-visible, [role="tab"]:focus-visible,
 [role="radio"]:focus-visible, input:focus-visible, summary:focus-visible {
@@ -408,6 +416,7 @@ def rf_choice(ui=None):
             st.caption(feed)
         return None, NO_RF, None
     src = ui.selectbox("Replay recorded RF test windows from", [NO_RF, *feed.sources],
+                       key="rf_src_select",
                                help="Recorded, held-out RF windows of this class (not a live "
                                     "receiver), one 25 ms snapshot per audio window. Audio and "
                                     "RF were never recorded together, so this is a what-if.")
@@ -1986,6 +1995,18 @@ def recording_choice(manifest: pd.DataFrame | None, ui=None):
     ui = ui or st.sidebar
     if ui is st.sidebar:
         ui.header("Audio input")
+    picked = st.session_state.get("picked")
+    if picked:
+        path = Path(picked["path"])
+        path = path if path.is_absolute() else DATA_DIR / path
+        ui.markdown(f'<div class="lbl">From the recordings list</div><div class="oval">'
+                    f'<b>{picked["title"]}</b> · {picked["source"]}</div>', unsafe_allow_html=True)
+        ui.button("Choose another source", key="clear-picked",
+                  on_click=lambda: st.session_state.pop("picked", None))
+        if path.is_file():
+            return str(path), path.read_bytes()
+        ui.error(f"Recording not found: {path}")
+        return None, None
     src = ui.selectbox(
         "Source", [*SOURCE_DATASETS, SOURCE_UPLOAD, SOURCE_LINK, SOURCE_MIC],
         help="Dataset recordings, any audio or video file, a YouTube (or other site) link, "
@@ -2034,8 +2055,10 @@ def recording_choice(manifest: pd.DataFrame | None, ui=None):
         except M.MediaError as e:
             ui.error(str(e))
             return None, None
+        rid, saved = save_mic_recording(clip.wav, clip.seconds)
         _report_clip(clip, ui)
-        return _external_key("mic", clip), clip.wav
+        ui.caption(f"Saved as {rid} in the recordings list (Microphone).")
+        return str(saved), clip.wav
 
     if manifest is None:
         ui.error("Audio manifest unavailable. Run scripts/build_manifest.py.")
@@ -2196,12 +2219,24 @@ OPS_CSS = """
         padding: 2px 7px; margin-right: 6px; }
 .chip.radio { color: var(--c-radio); border-color: color-mix(in srgb, var(--c-radio) 55%, transparent); }
 .inc .empty { color: var(--dd-faint); font-size: .86rem; }
+.inc { margin: 10px 0 6px; }
+/* Responsive: the three operations columns stack on tablets and phones
+   (sensor tiles, then coverage + result, then recordings). */
+@media (max-width: 1100px) {
+  [data-testid="stHorizontalBlock"]:has(.omap) { flex-wrap: wrap; }
+  [data-testid="stHorizontalBlock"]:has(.omap) > [data-testid="stColumn"] {
+      flex: 1 1 100% !important; width: 100% !important; min-width: 100% !important; }
+}
+@media (max-width: 640px) {
+  .ostate { font-size: 1.3rem; }
+  .oname { font-size: 12px; letter-spacing: .14em; }
+  .inc { padding: 12px; }
+  .cbar { gap: 8px 12px; }
+  .cbar .threat { min-width: 0; }
+  .flow .op { display: none; }
+}
 </style>
 """
-
-INCIDENT_WHAT = {"drone": "UAS", "unknown drone": "Unknown UAS",
-                 "low confidence": "Possible UAS · review", "no drone": "No drone"}
-
 
 def clip_source(key: str) -> str:
     """Where the clip came from, in the console's words."""
@@ -2209,7 +2244,7 @@ def clip_source(key: str) -> str:
         kind = key.rsplit(":", 1)[-1].split("-", 1)[0]
         return {"file": "File upload", "link": "Video link", "mic": "Microphone"}.get(kind, "File")
     low = key.lower()
-    for part, name in (("svanstrom", "Svanström outdoor"), ("droneaudio", "DroneAudioDataset"),
+    for part, name in (("dashboard_recordings", "Microphone"), ("svanstrom", "Svanström outdoor"), ("droneaudio", "DroneAudioDataset"),
                        ("aris", "ITU ARIS Lab")):
         if part in low:
             return name
@@ -2222,7 +2257,8 @@ def spectrum_figure_png(key: str, sig: np.ndarray, sr: int) -> bytes:
     fig, ax = plt.subplots(figsize=(9, 2.3))
     fig.patch.set_alpha(0)
     ax.set_facecolor("none")
-    ax.specgram(sig, NFFT=512, Fs=sr, noverlap=384, cmap="magma")
+    with np.errstate(divide="ignore"):          # exact silence (padding) has no log level
+        ax.specgram(sig, NFFT=512, Fs=sr, noverlap=384, cmap="magma")
     ax.set_ylim(0, min(8000, sr / 2))
     for side in ax.spines.values():
         side.set_color("#8a8f98")
@@ -2275,38 +2311,179 @@ def coverage_map(audio_state: str | None, rf_state: str | None, rf_on: bool) -> 
 </svg></div>"""
 
 
-def record_incident(key: str, rf_src: str | None, use_rf: bool, verdict, seconds: float,
-                    source: str):
-    """One incident per analysed clip (and RF choice), newest first."""
-    incidents = st.session_state.setdefault("incidents", [])
-    ident = (key, rf_src if use_rf else None)
-    if any(x["ident"] == ident for x in incidents):
-        return
-    from datetime import datetime, timezone
-    incidents.insert(0, {
-        "ident": ident, "id": f"INC-{len(incidents) + 1:04d}",
-        "time": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
-        "seconds": seconds, "state": verdict.state, "source": source, "rf": use_rf,
-        "title": key.split(":")[1] if key.startswith("upload:") else Path(key).stem,
-    })
+# ---------------------------------------------------------------------------
+# Recordings library (right column): audio datasets, RF recordings and the
+# clips recorded with the microphone on this dashboard.
+# ---------------------------------------------------------------------------
+import hashlib
+import os
+from datetime import datetime, timezone
 
 
-def incidents_panel() -> tuple[str, list[dict]]:
-    incidents = st.session_state.get("incidents", [])
-    if not incidents:
-        cards = ('<div class="inc"><div class="empty">No incidents yet. Every clip you analyse '
-                 'is listed here, newest first.</div></div>')
+def recordings_dir() -> Path:
+    """Where microphone clips and per-recording results are kept (git-ignored
+    data/; tests point DRONA_RECORDINGS_DIR at a temporary folder)."""
+    d = Path(os.environ.get("DRONA_RECORDINGS_DIR", DATA_DIR / "dashboard_recordings"))
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _store_path() -> Path:
+    return recordings_dir() / "index.json"
+
+
+def load_store() -> dict:
+    try:
+        s = json.loads(_store_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        s = {}
+    s.setdefault("seq", 0); s.setdefault("mics", []); s.setdefault("results", {})
+    return s
+
+
+def save_store(s: dict):
+    tmp = _store_path().with_suffix(".tmp")
+    tmp.write_text(json.dumps(s, indent=1), encoding="utf-8")
+    tmp.replace(_store_path())
+
+
+def save_mic_recording(wav: bytes, seconds: float) -> tuple[str, Path]:
+    """Keep a microphone clip so it stays in the library; the same audio is
+    stored once."""
+    s = load_store()
+    digest = hashlib.sha1(wav).hexdigest()[:16]
+    for m in s["mics"]:
+        if m["hash"] == digest and (recordings_dir() / m["file"]).is_file():
+            return m["id"], recordings_dir() / m["file"]
+    s["seq"] += 1
+    rid = f"MIC-{s['seq']:04d}"
+    now = datetime.now(timezone.utc)
+    name = f"{rid}_{now.strftime('%Y%m%d-%H%M%S')}.wav"
+    (recordings_dir() / name).write_bytes(wav)
+    s["mics"].insert(0, {"id": rid, "file": name, "hash": digest, "seconds": round(seconds, 1),
+                         "created": now.strftime("%Y-%m-%d %H:%M UTC")})
+    save_store(s)
+    return rid, recordings_dir() / name
+
+
+def remember_result(key: str, verdict, rf_src: str | None):
+    s = load_store()
+    s["results"][key] = {"state": verdict.state, "rf": rf_src,
+                         "when": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}
+    save_store(s)
+
+
+def result_chip(key: str, store: dict) -> str:
+    r = store["results"].get(key)
+    if not r:
+        return '<span class="chip">Not analysed</span>'
+    col = STATE_COLOR[r["state"]]
+    return (f'<span class="chip" style="color:{col};border-color:{col}">'
+            f'{S.STATE_LABEL[r["state"]]}{" · fused" if r.get("rf") else ""}</span>')
+
+
+def pick_audio(path: str, title: str, source: str):
+    st.session_state["picked"] = {"path": path, "title": title, "source": source}
+
+
+def pick_rf(label: str):
+    st.session_state["rf_src_select"] = label
+
+
+@st.cache_data(show_spinner=False)
+def audio_catalog(manifest: pd.DataFrame | None) -> pd.DataFrame:
+    """One row per audio recording: path, dataset, class, length in seconds."""
+    if manifest is None:
+        return pd.DataFrame(columns=["path", "dataset", "kind", "seconds"])
+    m = manifest.copy()
+    m["end"] = m["start_s"].fillna(0) + m["duration"].fillna(1)
+    g = m.groupby("path").agg(source=("source", "first"), label=("label", "first"),
+                              bg=("bg_category", "first"), model=("drone_model", "first"),
+                              seconds=("end", "max")).reset_index()
+    names = {"svanstrom": "Svanström outdoor", "droneaudio": "DroneAudioDataset",
+             "itu_aris": "ITU ARIS Lab"}
+    g["dataset"] = g["source"].map(names).fillna(g["source"])
+
+    def kind(r):
+        if r["label"] == "drone":
+            return "Drone" + (f" · {r['model']}" if isinstance(r["model"], str) and r["model"] else "")
+        return "Helicopter" if r["bg"] == "helicopter" else "Background" + (
+            f" · {r['bg']}" if isinstance(r["bg"], str) and r["bg"] else "")
+    g["kind"] = g.apply(kind, axis=1)
+    return g[["path", "dataset", "kind", "seconds"]].sort_values(["dataset", "path"])
+
+
+def lib_card(top: str, right: str, what: str, src: str, chips: str, color: str | None = None) -> str:
+    style = f' style="color:{color}"' if color else ""
+    return (f'<div class="inc"><div class="top"><span class="id">{top}</span>'
+            f'<span class="when">{right}</span></div><div class="what"{style}>{what}</div>'
+            f'<div class="src">{src}</div>{chips}</div>')
+
+
+def render_library(manifest: pd.DataFrame | None, feed):
+    """Right column: every recording that can be analysed, in the console's
+    incident-card style."""
+    store = load_store()
+    st.markdown('<div class="ohead2" style="padding-left:2px"><span class="lbl">Recordings</span>'
+                f'<span class="lbl" style="margin-left:auto">{len(store["results"])} analysed</span>'
+                '</div>', unsafe_allow_html=True)
+    kind = st.radio("Show", ["Audio", "Radio", "Microphone"], horizontal=True, key="lib_kind")
+
+    if kind == "Audio":
+        cat = audio_catalog(manifest)
+        if cat.empty:
+            st.info("Audio manifest unavailable. Run scripts/build_manifest.py.")
+            return
+        datasets = sorted(cat.dataset.unique(), key=lambda d: (d != "Svanström outdoor", d))
+        ds = st.selectbox("Dataset", datasets, key="lib_ds")
+        sub = cat[cat.dataset == ds]
+        classes = ["All", *sorted({k.split(" · ")[0] for k in sub.kind})]
+        cls = st.selectbox("Class", classes, key="lib_cls")
+        if cls != "All":
+            sub = sub[sub.kind.str.startswith(cls)]
+        q = st.text_input("Search name", key="lib_q", placeholder="e.g. DRONE_001")
+        if q.strip():
+            sub = sub[sub.path.str.contains(q.strip(), case=False, regex=False)]
+        st.caption(f"{len(sub):,} recordings · showing the first {min(len(sub), 40)}")
+        box = st.container(height=640, border=False)
+        with box:
+            for r in sub.head(40).itertuples(index=False):
+                key = str(DATA_DIR / r.path)
+                st.markdown(lib_card(Path(r.path).stem, f"{r.seconds:.0f} s", r.kind, r.dataset,
+                                     '<span class="chip">Acoustic</span>' + result_chip(key, store)),
+                            unsafe_allow_html=True)
+                st.button("Analyse", key=f"pick-{r.path}", on_click=pick_audio,
+                          args=(r.path, Path(r.path).stem, r.dataset))
+    elif kind == "Radio":
+        if feed is None:
+            st.info("RF recordings need the RF v2 model files (see Project briefing → readiness).")
+            return
+        with st.container(height=720, border=False):
+            for i, label in enumerate(feed.sources):
+                drone = "drone" in label.lower() and "no drone" not in label.lower()
+                what = "Drone transmission" if drone else "No drone (background or receiver noise)"
+                n = len(feed.sources[label])
+                st.markdown(lib_card(f"RF-{i + 1:04d}", f"{n} windows · 25 ms", what, label,
+                                     '<span class="chip radio">Radio</span>'
+                                     f'<span class="chip">{"Drone" if drone else "No drone"}</span>'),
+                            unsafe_allow_html=True)
+                st.button("Use as RF feed", key=f"rf-{i}", on_click=pick_rf, args=(label,))
     else:
-        cards = "".join(
-            f'<div class="inc"><div class="top"><span class="id">{x["id"]}</span>'
-            f'<span class="when">{x["time"]} · {x["seconds"]:.0f} s</span></div>'
-            f'<div class="what" style="color:{STATE_COLOR[x["state"]]}">'
-            f'{INCIDENT_WHAT[x["state"]]}</div>'
-            f'<div class="src">{x["source"]} · {x["title"]}</div>'
-            f'<span class="chip">Acoustic</span>'
-            + ('<span class="chip radio">Radio</span>' if x["rf"] else "")
-            + "</div>" for x in incidents)
-    return cards, incidents
+        mics = [m for m in store["mics"] if (recordings_dir() / m["file"]).is_file()]
+        with st.container(height=720, border=False):
+            if not mics:
+                st.markdown(lib_card("No recordings yet", "", "Record with the microphone",
+                                     "ACOUSTIC-01 → Source → Record with microphone. Every "
+                                     "recording is kept here.", ""), unsafe_allow_html=True)
+            for m in mics:
+                path = recordings_dir() / m["file"]
+                key = str(path)
+                st.markdown(lib_card(m["id"], f'{m["created"]} · {m["seconds"]:.0f} s',
+                                     "Microphone recording", "Recorded on this dashboard",
+                                     '<span class="chip">Acoustic</span><span class="chip">Mic</span>'
+                                     + result_chip(key, store)), unsafe_allow_html=True)
+                st.button("Analyse", key=f"pick-{m['id']}", on_click=pick_audio,
+                          args=(str(path), m["id"], "Microphone"))
 
 
 def sidebar_settings() -> dict:
@@ -2405,7 +2582,7 @@ def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = Non
         rf_v = S.recording_verdict(df.rf_state, min_hits) if use_rf else None
         st.session_state["bar_state"], st.session_state["bar_rf"] = verdict.state, use_rf
         title = Path(key).stem if not key.startswith("upload") else key.split(":")[1]
-        record_incident(key, rf_src, use_rf, verdict, len(sig) / L.SR, clip_source(key))
+        remember_result(key, verdict, rf_src if use_rf else None)
 
     # fill the tiles now that the states are known
     a_head.markdown(tile_head("Acoustic-01", "Primary", "on" if audio_v else ""),
@@ -2418,17 +2595,9 @@ def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = Non
                     unsafe_allow_html=True)
     r_state.markdown(tile_state(rf_v, "Off"), unsafe_allow_html=True)
 
-    # ---- right: incidents ----------------------------------------------
+    # ---- right: recordings library ------------------------------------
     with right:
-        cards, incidents = incidents_panel()
-        st.markdown(f'<div class="ocol"><div class="ohead2"><span class="lbl">Incidents</span></div>'
-                    f'{cards}</div>', unsafe_allow_html=True)
-        if incidents:
-            st.download_button(
-                "Export", data=pd.DataFrame([{k: v for k, v in x.items() if k != "ident"}
-                                             for x in incidents]).to_csv(index=False).encode(),
-                file_name="incidents.csv", mime="text/csv", key="export-incidents",
-                width="stretch")
+        render_library(manifest, feed)
 
     # ---- center: coverage, spectrum, and the full result ----------------
     with center:
