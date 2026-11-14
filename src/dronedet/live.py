@@ -99,6 +99,7 @@ def load(path: str | Path | BinaryIO) -> np.ndarray:
 
 RF_DETECTOR = MODELS / "rf_detector.joblib"
 FUSION = MODELS / "fusion.joblib"
+FUSION_MODELS = MODELS / "fusion_models.joblib"
 RF_V2 = DATA_DIR / "rf_features_v2"
 
 
@@ -109,13 +110,23 @@ class RFFeed:
 
     def __init__(self):
         from dronedet.models import rf as M
-        for p in (RF_DETECTOR, FUSION, RF_V2 / "X.npy"):
+        for p in (RF_DETECTOR, RF_V2 / "X.npy"):
             if not p.exists():
                 raise FileNotFoundError(f"{p} missing; run scripts/prepare_rf.py, "
-                                        "eval_rf_tampere.py, train_rf_v2.py and "
-                                        "eval_fusion.py")
+                                        "eval_rf_tampere.py and train_rf_v2.py")
+        if FUSION_MODELS.exists():
+            saved_fusions = joblib.load(FUSION_MODELS)
+            self.fusions = saved_fusions["methods"]
+        elif FUSION.exists():
+            self.fusions = {"sum": joblib.load(FUSION)}
+        else:
+            raise FileNotFoundError(
+                f"{FUSION_MODELS} missing; run scripts/eval_fusion.py"
+            )
+        if not self.fusions:
+            raise ValueError(f"No fusion models found in {FUSION_MODELS}")
         self.det = joblib.load(RF_DETECTOR)
-        self.fusion = joblib.load(FUSION)
+        self.fusion = self.fusions.get("sum", next(iter(self.fusions.values())))
         self.features = M.MODELS[self.det.info.get("features", M.DEPLOY)][0]
         X = np.load(RF_V2 / "X.npy")
         df = pd.read_parquet(RF_V2 / "index.parquet")

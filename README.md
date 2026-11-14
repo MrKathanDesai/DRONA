@@ -28,7 +28,7 @@ streamlit run app/dashboard.py     # results and evaluation dashboard
 | 9 | RF uncertainty + unknown-signature flags | **done** — see `reports/rf_uncertainty.md` |
 | 10 | RF on a new receiver (Tampere) + white-noise control | **done: RF v1 calls pure noise "drone"** — see `reports/rf_tampere.md` |
 | 10b | RF v2: relabelled silence, receiver-noise negatives, second-receiver drones | **done: noise is "no drone", 9/10 unseen drones caught** — see `reports/rf_v2.md` |
-| 11 | Audio + RF fusion, ablation, dashboard RF panel | **done** — see `reports/fusion.md` |
+| 11 | Audio + RF fusion, ablation, dashboard RF panel | **done (unpaired-data upper bound)** — learned layer + sum ablation; four-state RF replay requires RF v2 artifacts; see `reports/fusion.md` |
 | 12 | Real speech + music in the noise test | **done** — in `reports/noise_robustness.md` |
 | 12b | RF v3 experiment: simulated Wi-Fi / Bluetooth / microwave negatives, forest vs 1D-CNN, 3-of-5 smoothing, time-frequency features | **done** — see `reports/rf_v3.md` |
 | 12c | RF probability calibration + held-out Phantom (Vidhi) | **done** — see `reports/rf_trust.md` |
@@ -73,7 +73,7 @@ python scripts/train_rf.py              # RF detectors + quiet-window check
 python scripts/eval_rf_uncertainty.py   # RF v1 flags and open set
 python scripts/eval_rf_tampere.py       # RF v1 on a new receiver + white-noise control
 python scripts/train_rf_v2.py           # RF v2, saves data/models/rf_detector.joblib
-python scripts/eval_fusion.py           # audio + RF fusion ablation, saves fusion.joblib
+python scripts/eval_fusion.py           # ablation; saves sum + learned fusion models
 python scripts/train_rf_v3.py           # RF v3 experiment (simulated Wi-Fi/BT/microwave), report only
 python scripts/eval_rf_trust.py         # RF calibration + Phantom held-out unknown test
 python scripts/train_audio_baseline.py  # Vidhi: random-forest audio baseline
@@ -388,7 +388,7 @@ scripts/eval_identify.py      which-drone confusion matrices
 scripts/eval_rf_uncertainty.py RF v1 flags, saves data/models/rf_detector_dronerf.joblib
 scripts/eval_rf_tampere.py    RF v1 on a new receiver, white-noise control
 scripts/train_rf_v2.py        RF v2 (deployed), saves data/models/rf_detector.joblib
-scripts/eval_fusion.py        fusion ablation, saves data/models/fusion.joblib
+scripts/eval_fusion.py        fusion ablation; saves sum + learned models for replay
 scripts/detect.py             run the detector on any audio file
 scripts/make_figures.py       six presentation figures (spectrograms, results, timelines)
 reports/baseline_audio.{md,json}

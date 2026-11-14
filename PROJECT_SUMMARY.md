@@ -412,7 +412,7 @@ Evaluation uses synthetic pairs: an outdoor Svanström audio window and an RF wi
 - Tier 4 reused those settings and was not tuned on Svanström, but tier 3 test data had already been seen.
 - The test sets are 12–33% drone, far more than real life. At 1% drone windows, tier 4 precision would fall from 0.917 to about 0.18.
 - `scripts/detect.py` and the dashboard use the tier 4 detector; outdoor recall is still only about 22% of windows.
-- Audio probabilities are not calibrated; its uncertainty flags rely on ranks only. RF calibration helpers are implemented but have not been run because the prepared DroneRF feature cache is absent.
+- Audio probabilities are not calibrated; its uncertainty flags rely on ranks only. RF temperature scaling and calibration metrics are reported in `reports/rf_trust.md`; these are single-session results, not independent RF validation.
 - Noise mixing is additive at fixed SNR: no reverberation, distance or microphone effects.
 - `data/models/rf_forest.joblib` and `rf_detector_dronerf.joblib` (v1) are not usable detectors: they call pure noise "drone". `rf_detector.joblib` is v2.
 - RF v2's only real no-drone recordings are DroneRF's lab background; its noise negatives are synthetic. Its false-alarm rate on real 2.4 GHz traffic elsewhere is unknown, and it misses a band-filling signal like DroneRF's Phantom when that drone is not in training.

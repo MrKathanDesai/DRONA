@@ -11,6 +11,7 @@ fused view is a what-if; see reports/fusion.md.
 from __future__ import annotations
 
 import io
+import importlib
 import json
 import sys
 import time
@@ -40,6 +41,12 @@ REPORTS = ROOT / "reports"
 STATE_COLOR = {"drone": "#d6452a", "unknown drone": "#7a4fd6",
                "low confidence": "#d99a0b", "no drone": "#8a8984"}
 STATE_ICON = {"drone": "🔴", "unknown drone": "🟣", "low confidence": "🟡", "no drone": "⚪"}
+FINAL_STATE_LABEL = {
+    "no drone": "No Drone",
+    "drone": "Known Drone",
+    "unknown drone": "Unknown Drone",
+    "low confidence": "Low Confidence",
+}
 
 st.set_page_config(page_title="Skyguard · Counter-drone Lab", page_icon="🛰️",
                    layout="wide")
@@ -270,9 +277,24 @@ NO_RF = "None (audio only)"
 @st.cache_resource(show_spinner="Loading RF detector and fusion ...")
 def rf_feed():
     try:
-        return L.RFFeed()
+        feed_factory = getattr(L, "RFFeed", None)
+        if feed_factory is None:
+            importlib.invalidate_caches()
+            importlib.reload(L)
+            feed_factory = getattr(L, "RFFeed", None)
+        if feed_factory is None:
+            return (
+                "The loaded live module has no RF replay support. Stop the old "
+                "Streamlit process and restart it from this project directory."
+            )
+        return feed_factory()
     except FileNotFoundError as e:
         return str(e)
+    except AttributeError as e:
+        return (
+            "The live module is stale or incompatible. Restart Streamlit from the "
+            f"project directory. Details: {e}"
+        )
 
 
 def rf_choice():
@@ -280,24 +302,42 @@ def rf_choice():
     feed = rf_feed()
     if isinstance(feed, str):
         st.sidebar.caption(f"RF unavailable: {feed}")
-        return None, NO_RF
+        return None, NO_RF, None
     src = st.sidebar.selectbox("Replay RF windows from", [NO_RF, *feed.sources],
                                help="Held-out windows of this class, one 25 ms "
                                     "snapshot per audio window. A what-if: audio and "
                                     "RF were never recorded together.")
-    return feed, src
+    methods = list(feed.fusions)
+    if "learned" in methods and "sum" in methods:
+        method = st.sidebar.radio(
+            "Fusion rule",
+            ["learned", "sum"],
+            format_func=lambda value: (
+                "Learned fusion layer" if value == "learned"
+                else "Evidence sum (current research default)"
+            ),
+            help=(
+                "Both rules are research replays on unpaired audio/RF recordings. "
+                "The demo opens in learned mode. The project's selected research "
+                "rule remains evidence sum because learned fusion nearly misses "
+                "RF-silent drones in the reported experiment."
+            ),
+        )
+    else:
+        method = methods[0]
+        st.sidebar.caption(f"Fusion rule available: {method}")
+    return feed, src, method
 
 
 def fused_timeline(df: pd.DataFrame, thr: float):
     base = alt.Chart(df).encode(x=alt.X("t:Q", title="time (s)"))
     bars = base.mark_bar(size=8).encode(
         y=alt.Y("fused:Q", title="fused evidence (LLR)"),
-        color=alt.Color("fused_state:N", title="fused state",
-                        scale=alt.Scale(domain=list(STATE_COLOR),
-                                        range=list(STATE_COLOR.values()))),
+        color=alt.Color("fused_state_label:N", title="final multimodal state"),
         tooltip=["t", alt.Tooltip("llr_audio:Q", format=".2f"),
                  alt.Tooltip("llr_rf:Q", format=".2f"),
-                 alt.Tooltip("fused:Q", format=".2f"), "fused_state", "fused_reason"])
+                 alt.Tooltip("fused:Q", format=".2f"),
+                 "fused_state_label", "fused_reason"])
     rule = alt.Chart(pd.DataFrame({"thr": [thr]})).mark_rule(
         strokeDash=[4, 4], color="#52514e").encode(y="thr:Q")
     return alt.layer(bars, rule).properties(height=200)
@@ -913,12 +953,110 @@ def render_archived_training_curves(report: dict):
         )
 
 
+def fusion_ablation_rows(report: dict, scenario: str) -> pd.DataFrame:
+    methods = report["scenarios"][scenario]
+    labels = {
+        "audio only": "Audio only",
+        "RF only": "RF only",
+        "sum": "Evidence sum",
+        "learned": "Learned fusion layer",
+        "OR": "OR rule",
+        "AND": "AND rule",
+    }
+    preferred_order = ("audio only", "RF only", "sum", "learned", "OR", "AND")
+    rows = []
+    for method in preferred_order:
+        if method not in methods:
+            continue
+        metrics = methods[method]
+        rows.append({
+            "Method": labels[method],
+            "PR-AUC": metrics.get("pr_auc"),
+            "Recall": metrics.get("recall"),
+            "False-positive rate": metrics.get("fpr"),
+            "Accuracy": metrics.get("accuracy"),
+            "F1": metrics.get("f1"),
+        })
+    return pd.DataFrame(rows)
+
+
+def _highlight_learned_fusion(row: pd.Series) -> list[str]:
+    color = "background-color: rgba(84, 220, 255, 0.16); font-weight: 700"
+    return [color if row["Method"] == "Learned fusion layer" else "" for _ in row]
+
+
+def render_fusion_highlights(report: dict | None):
+    st.markdown("### Learned fusion layer · final multimodal result")
+    if report is None:
+        st.info("Fusion evaluation report is unavailable; run `python scripts/eval_fusion.py`.")
+        return
+
+    scenario = "both sensors" if "both sensors" in report["scenarios"] else next(
+        iter(report["scenarios"])
+    )
+    methods = report["scenarios"][scenario]
+    learned = methods.get("learned")
+    audio = methods.get("audio only")
+    rf = methods.get("RF only")
+    st.markdown(
+        '<div class="callout"><strong>Research result, not a validated field decision.</strong> '
+        'The learned logistic-regression fusion layer combines calibrated audio and RF '
+        'evidence. The test pairs are independently sampled by class because the datasets '
+        'do not contain synchronized audio/RF recordings. The current replay default remains '
+        'the evidence-sum rule; select the learned layer in the Live feed to inspect its '
+        'four-state output.</div>',
+        unsafe_allow_html=True,
+    )
+    if learned is not None:
+        cards = st.columns(3)
+        for column, title, metrics in (
+            (cards[0], "Audio only", audio),
+            (cards[1], "RF only", rf),
+            (cards[2], "Learned fusion · both sensors", learned),
+        ):
+            if metrics is None:
+                continue
+            column.markdown(f"**{title}**")
+            column.metric("Recall", f"{metrics['recall']:.1%}")
+            column.caption(
+                f"FPR {metrics['fpr']:.2%} · PR-AUC "
+                f"{metrics['pr_auc']:.3f}" if metrics.get("pr_auc") is not None
+                else f"FPR {metrics['fpr']:.2%}"
+            )
+    state_columns = st.columns(4)
+    state_descriptions = (
+        ("⚪ No Drone", "Fused evidence is below the calibrated decision threshold."),
+        ("🔴 Known Drone", "Positive evidence; no unknown-signature flag is raised."),
+        ("🟣 Unknown Drone", "Positive evidence with an unfamiliar drone signature."),
+        ("🟡 Low Confidence", "Near the review boundary or unfamiliar input; request review."),
+    )
+    for column, (label, description) in zip(state_columns, state_descriptions):
+        column.markdown(f"**{label}**")
+        column.caption(description)
+    st.caption(
+        f"Shown scenario: {scenario}. These are synthetic-pair test results, not "
+        "performance on synchronized flight captures."
+    )
+    table = fusion_ablation_rows(report, scenario)
+    st.dataframe(
+        table.style.apply(_highlight_learned_fusion, axis=1).format({
+            "PR-AUC": "{:.3f}",
+            "Recall": "{:.1%}",
+            "False-positive rate": "{:.2%}",
+            "Accuracy": "{:.1%}",
+            "F1": "{:.3f}",
+        }, na_rep="n/a"),
+        hide_index=True,
+        width="stretch",
+    )
+
+
 def render_overview(reports: dict, manifest: pd.DataFrame | None):
     st.markdown(
         '<div class="callout"><strong>Honest system status:</strong> Audio is trained and '
-        'evaluated. RF results are available as research experiments but show a recording-session '
-        'shortcut. A learned audio + RF fusion model has not been trained, so there is no validated '
-        'combined decision to report.</div>',
+        'evaluated. RF v2, the learned fusion layer, and an evidence-sum rule are available as '
+        'research experiments. Fusion pairs are not co-recorded, so no field-validated combined '
+        'decision is claimed.</div>',
         unsafe_allow_html=True,
     )
     a, r, f = st.columns(3)
@@ -928,12 +1066,12 @@ def render_overview(reports: dict, manifest: pd.DataFrame | None):
               "and Grad-CAM explanations.")
     with r:
         panel("02 · EXPERIMENTAL", "RF research",
-              "DroneRF model comparisons and classification results are shown with a prominent "
-              "dataset-confounding warning.", "pending")
+              "RF v2, second-receiver checks, and simulated-emitter experiments; real field "
+              "Wi-Fi/Bluetooth false alarms remain unknown.", "pending")
     with f:
-        panel("03 · NOT TRAINED", "Multimodal fusion",
-              "No paired, validated audio/RF fusion model yet. Final fused output is intentionally "
-              "withheld.", "pending")
+        panel("03 · RESEARCH PROTOTYPE", "Learned multimodal fusion",
+              "Learned logistic fusion and four-state output are implemented; synthetic pairs "
+              "are an upper-bound experiment, not paired-flight validation.", "pending")
 
     st.subheader("End-to-end project pipeline")
     st.markdown(
@@ -943,11 +1081,12 @@ def render_overview(reports: dict, manifest: pd.DataFrame | None):
             <span>1-second windows → log-mel / frozen PANNs → score, uncertainty state and Grad-CAM.
             Noise robustness is evaluated separately.</span></div>
           <div class="stage"><small>Stage 02 · RF</small><strong>Radio evidence</strong>
-            <span>DroneRF windows → PSD features → classical / CNN experiments. Current scores are
-            not deployment-valid because session leakage remains plausible.</span></div>
-          <div class="stage"><small>Stage 03 · fusion</small><strong>Final multimodal decision · pending</strong>
-            <span>Planned: learned fusion of synchronized audio/RF confidence vectors into
-            No Drone / Known Drone / Unknown Drone / Low Confidence.</span></div>
+            <span>RF v2 uses transmission-aware training and a second receiver. Real Wi-Fi /
+            Bluetooth field negatives are still missing.</span></div>
+          <div class="stage"><small>Stage 03 · fusion</small><strong>Final multimodal state · research</strong>
+            <span>Audio + RF evidence → learned fusion layer → No Drone / Known Drone /
+            Unknown Drone / Low Confidence. Current evaluation uses unpaired synthetic
+            sensor pairs.</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -966,6 +1105,7 @@ def render_overview(reports: dict, manifest: pd.DataFrame | None):
     c3.metric("Drone-labelled rows", f"{drone:,}" if total else "Unavailable")
     c4.metric("Background rows", f"{background:,}" if total else "Unavailable")
 
+    render_fusion_highlights(reports.get("fusion"))
     render_audio_results(reports["baseline"], reports["pretrained"], reports["outdoor"])
     render_dataset_inventory(manifest)
     render_proposal_data_status()
@@ -1461,32 +1601,52 @@ def render_rf_tab(
     render_report_downloads(downloads, "rf")
 
 
-def render_fusion_tab(rf_report: dict):
+def render_fusion_tab(fusion_report: dict | None):
     st.subheader("Audio + RF fusion · ablation")
-    st.markdown(
-        '<div class="callout"><strong>Read as an upper bound.</strong> No public corpus records '
-        'audio and RF of the same flight, so each test pair joins an audio window and an RF window '
-        'of the same class, drawn independently. Each sensor is calibrated to a log-likelihood '
-        'ratio; <em>sum</em> adds them, <em>learned</em> is the proposal\'s logistic-regression '
-        'fusion layer.</div>', unsafe_allow_html=True)
-    fusion = REPORTS / "fusion.json"
-    if not fusion.exists():
+    if fusion_report is None:
         st.info("Run `python scripts/eval_fusion.py` to generate the fusion ablation.")
         return
-    rep = json.loads(fusion.read_text(encoding="utf-8"))
-    rows = []
-    for scenario, methods in rep["scenarios"].items():
-        for method, m in methods.items():
-            rows.append({"scenario": scenario, "method": method,
-                         "PR-AUC": m.get("pr_auc"), "recall": m.get("recall"),
-                         "FPR": m.get("fpr"), "F1": m.get("f1")})
-    table = pd.DataFrame(rows)
-    scenario = st.selectbox("Scenario", list(rep["scenarios"]))
-    st.dataframe(table[table.scenario == scenario].drop(columns="scenario").round(3),
-                 hide_index=True, width="stretch")
-    st.caption("Audio-only vs RF-only vs fused on the same pairs. Thresholds: 1% FPR on "
-               "validation pairs. 'RF-silent drone' = an autonomous drone with no radio link, "
-               "where only audio can help.")
+    st.markdown(
+        '<div class="callout"><strong>Learned fusion layer and ablation.</strong> '
+        'Each sensor score is calibrated to evidence; a learned logistic-regression layer '
+        'combines audio and RF for the learned result. The evidence-sum fusion rule is also '
+        'reported. Pairs are independently sampled, not synchronized recordings, so results '
+        'are an upper-bound research experiment.</div>',
+        unsafe_allow_html=True,
+    )
+    render_fusion_highlights(fusion_report)
+    scenario = st.selectbox(
+        "Compare methods in scenario",
+        list(fusion_report["scenarios"]),
+        index=0,
+        key="fusion_ablation_scenario",
+    )
+    st.markdown(f"#### Full ablation · {scenario}")
+    table = fusion_ablation_rows(fusion_report, scenario)
+    st.dataframe(
+        table.style.apply(_highlight_learned_fusion, axis=1).format({
+            "PR-AUC": "{:.3f}",
+            "Recall": "{:.1%}",
+            "False-positive rate": "{:.2%}",
+            "Accuracy": "{:.1%}",
+            "F1": "{:.3f}",
+        }, na_rep="n/a"),
+        hide_index=True,
+        width="stretch",
+    )
+    if scenario == "RF-silent drone (autonomous)":
+        learned = fusion_report["scenarios"][scenario].get("learned", {})
+        audio = fusion_report["scenarios"][scenario].get("audio only", {})
+        st.warning(
+            "Important ablation finding: on the RF-silent drone scenario, the learned "
+            f"layer recall is {learned.get('recall', float('nan')):.1%}, versus "
+            f"{audio.get('recall', float('nan')):.1%} for audio only. The learned layer "
+            "must be treated as experimental, not as a validated deployment decision."
+        )
+    st.caption(
+        "Thresholds are selected on validation pairs. The four outputs are No Drone, "
+        "Known Drone, Unknown Drone and Low Confidence."
+    )
     render_md_report("fusion.md", "Full fusion report")
 
 
@@ -1601,12 +1761,13 @@ def recording_choice(manifest: pd.DataFrame | None):
 
 
 def render_live_monitor(manifest: pd.DataFrame | None):
-    st.subheader("Simulated live feed (audio + optional RF)")
+    st.subheader("Simulated live feed · learned audio + RF decision")
     st.caption("One-second audio windows, replayed sequentially. Pick an RF source in the sidebar "
-               "to replay held-out RF windows beside the audio and see the fused decision. Audio "
-               "and RF were never recorded together, so the fused view is a what-if.")
+               "to replay held-out RF windows beside the audio. The selected fusion rule produces "
+               "No Drone / Known Drone / Unknown Drone / Low Confidence. Audio and RF were never "
+               "recorded together, so this is a research what-if, not paired-flight validation.")
     key, audio = recording_choice(manifest)
-    feed, rf_src = rf_choice()
+    feed, rf_src, fusion_method = rf_choice()
     st.sidebar.header("Replay settings")
     hop = st.sidebar.select_slider("Window hop (s)", [0.25, 0.5, 1.0], value=0.5)
     min_hits = st.sidebar.number_input("Consecutive hits to alarm", 1, 5, 2)
@@ -1624,7 +1785,8 @@ def render_live_monitor(manifest: pd.DataFrame | None):
     psd = None
     if use_rf:
         psd, a_rf = feed.windows(rf_src, len(df))
-        fz, fthr = L.fuse(df, feed.fusion, a_rf["p"],
+        selected_fusion = feed.fusions[fusion_method]
+        fz, fthr = L.fuse(df, selected_fusion, a_rf["p"],
                           {k: a_rf[k] for k in L.AUDIO_FLAGS})
         df = pd.concat([df, fz], axis=1)
         df["rf_p"] = a_rf["p"]
@@ -1633,11 +1795,23 @@ def render_live_monitor(manifest: pd.DataFrame | None):
     else:
         df["shown_state"], df["shown_reason"] = df.state, df.reason
         hits = df.hit
+    df["shown_label"] = df.shown_state.map(FINAL_STATE_LABEL).fillna("Low Confidence")
+    if use_rf:
+        df["fused_state_label"] = df.fused_state.map(FINAL_STATE_LABEL).fillna(
+            "Low Confidence"
+        )
     run = L.longest_run(hits)
     alarm = run >= min_hits
     st.markdown(
         f'<div class="callout">Active audio model: <strong>{det.name}</strong> · '
-        f'threshold {det.threshold:.3f}. Human review remains required.</div>',
+        f'threshold {det.threshold:.3f}. '
+        + (
+            f'Final-state rule: <strong>{fusion_method}</strong> fusion. '
+            'Unpaired RF replay is experimental; human review remains required.'
+            if use_rf else
+            'RF unavailable; showing the audio-only state. Human review remains required.'
+        )
+        + '</div>',
         unsafe_allow_html=True,
     )
     live_slot = st.empty()
@@ -1647,13 +1821,15 @@ def render_live_monitor(manifest: pd.DataFrame | None):
             with live_slot.container():
                 c1, c2 = st.columns([1, 3])
                 c1.metric("time", f"{r.t:.1f} s")
-                c1.markdown(f"### {STATE_ICON[r.shown_state]} {r.shown_state}")
+                c1.markdown(
+                    f"### {STATE_ICON.get(r.shown_state, '🟡')} {r.shown_label}"
+                )
                 c1.caption(r.shown_reason or r.tags)
                 c2.altair_chart(timeline(df, det.threshold, upto=i), width="stretch")
             time.sleep(hop / speed)
         live_slot.empty()
 
-    verdict = "🚨 DRONE ALARM" if alarm else "✅ No alarm"
+    verdict = "🚨 Drone candidate" if alarm else "✅ No alarm"
     title = Path(key).stem if not key.startswith("upload") else key.split(":")[1]
     st.subheader(f"{verdict} · {title}")
     m = st.columns(5)
@@ -1662,6 +1838,15 @@ def render_live_monitor(manifest: pd.DataFrame | None):
     m[2].metric("Longest run", f"{run} (need {min_hits})")
     m[3].metric("Low confidence", int((df.shown_state == "low confidence").sum()))
     m[4].metric("Max score", f"{df.p.max():.3f}")
+    if use_rf:
+        state_counts = df.shown_label.value_counts()
+        st.markdown("#### Final multimodal state by window")
+        state_cards = st.columns(4)
+        for column, state in zip(
+            state_cards,
+            ("No Drone", "Known Drone", "Unknown Drone", "Low Confidence"),
+        ):
+            column.metric(state, int(state_counts.get(state, 0)))
     st.audio(to_wav(sig), format="audio/wav")
 
     i = st.slider("Inspect window", 0, len(df) - 1, int(df.p.idxmax()),
@@ -1674,7 +1859,7 @@ def render_live_monitor(manifest: pd.DataFrame | None):
     r = df.iloc[i]
     left, right = st.columns([1, 2])
     with left:
-        st.markdown(f"#### {STATE_ICON[r.shown_state]} {r.shown_state} · "
+        st.markdown(f"#### {STATE_ICON.get(r.shown_state, '🟡')} {r.shown_label} · "
                     f"{r.t:.1f}–{r.t + 1:.1f} s")
         if r.shown_reason:
             st.caption(f"Flagged: {r.shown_reason}")
@@ -1731,6 +1916,10 @@ def main():
         "noise": read_report("noise_robustness.json"),
         "uncertainty": read_report("uncertainty_audio.json"),
         "rf": read_report("rf_detection.json"),
+        "fusion": (
+            json.loads((REPORTS / "fusion.json").read_text(encoding="utf-8"))
+            if (REPORTS / "fusion.json").exists() else None
+        ),
         "audio_baseline": read_report("audio_baseline.json"),
         "audio_cnn": read_report("audio_cnn.json"),
         "audio_noise": read_report("audio_noise_robustness.json"),
@@ -1767,7 +1956,7 @@ def main():
             reports["rf_trust"],
         )
     with tabs[3]:
-        render_fusion_tab(reports["rf"])
+        render_fusion_tab(reports["fusion"])
     with tabs[4]:
         render_live_monitor(manifest)
     with tabs[5]:
