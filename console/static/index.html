@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Drona</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%23e9ecef' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23e05a3f'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg: oklch(14.5% 0.006 250);
+  --panel: oklch(17.5% 0.007 250);
+  --line: oklch(25% 0.008 250);
+  --line-2: oklch(31% 0.009 250);
+  --ink: oklch(94% 0.004 250);
+  --ink-2: oklch(72% 0.008 250);
+  --ink-3: oklch(54% 0.01 250);
+  --clear: oklch(78% 0.09 160);
+  --maybe: oklch(81% 0.13 80);
+  --alert: oklch(66% 0.2 32);
+  --unknown: oklch(68% 0.13 300);
+  --tone: var(--ink-3);
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --gutter: clamp(18px, 3.2vw, 44px);
+}
+body[data-state="clear"]{ --tone: var(--clear) }
+body[data-state="maybe"]{ --tone: var(--maybe) }
+body[data-state="drone"]{ --tone: var(--alert) }
+body[data-state="drone"][data-unknown="1"]{ --tone: var(--unknown) }
+
+*{ box-sizing: border-box; margin: 0; padding: 0 }
+body{
+  font-family: var(--font); background: var(--bg); color: var(--ink);
+  -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column;
+}
+button, select, input{ font: inherit; color: inherit }
+.label{ font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3) }
+
+/* ---------- top bar ---------- */
+.bar{
+  display: flex; align-items: center; gap: 22px; padding: 14px var(--gutter);
+  border-bottom: 1px solid var(--line);
+}
+.mark{ font-size: 14px; font-weight: 700; letter-spacing: .32em }
+.chips{ display: flex; gap: 8px; flex-wrap: wrap }
+.chip{
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.chip i{ width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3) }
+.chip.live i{ background: var(--clear) }
+.chip.hit{ color: var(--alert); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--alert) 50%, transparent) }
+.chip.hit i{ background: var(--alert) }
+.spacer{ flex: 1 }
+.clock{ font-size: 13px; font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; letter-spacing: .04em }
+
+/* ---------- flag ---------- */
+.flag{ display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows .5s var(--ease) }
+.flag.on{ grid-template-rows: 1fr; visibility: visible }
+.flag > div{ overflow: hidden }
+.flag .inner{
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px var(--gutter);
+  background: color-mix(in srgb, var(--alert) 16%, var(--bg)); border-bottom: 1px solid color-mix(in srgb, var(--alert) 45%, transparent);
+}
+.flag svg{ width: 15px; height: 15px; color: var(--alert); flex: none }
+.flag p{ flex: 1; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase }
+.flag p span{ color: var(--ink-2); font-weight: 500 }
+.btn{
+  border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer;
+  font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  transition: background-color .25s, color .25s, opacity .25s;
+}
+.btn:focus-visible, .seg input:focus-visible + label, select:focus-visible{ outline: 2px solid var(--ink); outline-offset: 2px }
+.btn.primary{ background: var(--ink); color: var(--bg) }
+.btn.primary:hover{ background: oklch(100% 0 0 / .85) }
+.btn.alert{ background: var(--alert); color: oklch(98% 0.005 85) }
+.btn:disabled{ opacity: .3; cursor: default }
+
+/* ---------- status ---------- */
+.status{
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 32px;
+  padding: clamp(28px, 6vh, 64px) var(--gutter) clamp(24px, 4vh, 40px);
+}
+h1{
+  font-size: clamp(52px, 8.2vw, 120px); line-height: .95; font-weight: 650; letter-spacing: -.04em;
+  margin: 14px 0 18px; color: var(--ink); transition: color .5s var(--ease);
+}
+body[data-state="drone"] h1{ color: var(--tone) }
+.swap{ animation: rise .55s var(--ease) both }
+@keyframes rise{ from{ opacity: 0; transform: translateY(8px) } }
+.tags{ display: flex; gap: 8px; min-height: 26px; flex-wrap: wrap }
+.tags .chip{ color: var(--ink) }
+.tags .chip.tone{ color: var(--tone); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--tone) 55%, transparent) }
+
+.controls{ display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 30px }
+.seg{ display: inline-grid; grid-auto-flow: column; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--line-2); padding: 3px }
+.seg input{ position: absolute; opacity: 0; pointer-events: none }
+.seg label{
+  padding: 7px 14px; border-radius: 6px; cursor: pointer; user-select: none;
+  font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3);
+  transition: background-color .25s, color .25s;
+}
+.seg input:checked + label{ background: var(--line-2); color: var(--ink) }
+.file{ display: none }
+body[data-input="file"] .file{ display: inline-flex }
+.file label{
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2); max-width: 300px;
+}
+.file label.over{ box-shadow: inset 0 0 0 1px var(--ink-2); color: var(--ink) }
+.file label span{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.file input{ display: none }
+.progress{ height: 2px; background: var(--line); margin-top: 18px; max-width: 420px; opacity: 0; transition: opacity .3s }
+.progress i{ display: block; height: 100%; background: var(--ink-2); transform-origin: left; transform: scaleX(0) }
+body.running[data-input="file"] .progress{ opacity: 1 }
+
+/* ring */
+.ring{ --level: 0; position: relative; width: clamp(180px, 22vw, 280px); aspect-ratio: 1 }
+.ring span{ position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--line-2) }
+.ring span:nth-child(2){ inset: 17% }
+.ring span:nth-child(3){ inset: 34%; box-shadow: inset 0 0 0 1px var(--tone); transition: box-shadow .5s }
+.ring .level{
+  position: absolute; inset: 34%; border-radius: 50%; background: color-mix(in oklch, var(--tone) 16%, transparent);
+  transform: scale(calc(1 + var(--level) * 1.9)); transition: transform .15s linear, background-color .5s;
+}
+.ring .core{ position: absolute; inset: 46%; border-radius: 50%; background: var(--tone); transition: background-color .5s }
+.ring .tick{ position: absolute; left: 50%; top: -6px; width: 1px; height: 12px; background: var(--line-2) }
+.ring .tick.b{ top: auto; bottom: -6px } .ring .tick.l, .ring .tick.r{ top: 50%; left: -6px; width: 12px; height: 1px }
+.ring .tick.r{ left: auto; right: -6px }
+body[data-state="drone"] .ring span:nth-child(1), body[data-state="drone"] .ring span:nth-child(2){
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--tone) 60%, transparent); animation: pulse 1.8s var(--ease) infinite }
+body[data-state="drone"] .ring span:nth-child(1){ animation-delay: .25s }
+@keyframes pulse{ 50%{ opacity: .35 } }
+
+/* ---------- panels ---------- */
+.grid{
+  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1px; background: var(--line);
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); flex: 1;
+}
+.panel{ background: var(--bg); padding: 18px var(--gutter) 22px; display: flex; flex-direction: column; min-width: 0 }
+.panel.wide{ grid-column: 1 / -1 }
+.panel header{ display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; min-height: 30px }
+.spec{
+  position: relative; border-radius: 8px; overflow: hidden; flex: 1;
+  background: repeating-linear-gradient(to bottom, transparent 0 calc(25% - 1px), var(--line) calc(25% - 1px) 25%), var(--panel);
+}
+.spec canvas{ display: block; width: 100%; height: 100% }
+.spec.audio{ height: clamp(170px, 26vh, 260px); flex: none }
+.spec.radio{ min-height: 110px }
+.spec .idle{ position: absolute; inset: 0; display: grid; place-items: center; transition: opacity .4s }
+body.used .spec.audio .idle, body.rfon .spec.radio .idle{ opacity: 0 }
+
+select{
+  appearance: none; -webkit-appearance: none; background: var(--panel); border: 0; border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--line-2); padding: 7px 30px 7px 12px; font-size: 13px; cursor: pointer;
+  max-width: 100%; background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat;
+}
+.radio-row{ display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap }
+
+.log{ list-style: none; overflow: auto; max-height: 260px }
+.log li{
+  display: grid; grid-template-columns: 8px 1fr auto; gap: 12px; align-items: baseline;
+  padding: 11px 0; border-top: 1px solid var(--line); animation: rise .5s var(--ease) both;
+}
+.log li:first-child{ border-top: 0 }
+.log li i{ width: 7px; height: 7px; border-radius: 50%; background: var(--alert); transform: translateY(-1px) }
+.log li.unknown i{ background: var(--unknown) }
+.log li b{ font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase }
+.log li small{ display: block; font-size: 12px; color: var(--ink-3); margin-top: 3px }
+.log li time{ font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums }
+.log li.now time{ color: var(--alert) }
+.log li .f{ margin-left: 8px; font-size: 10px; font-weight: 700; letter-spacing: .14em; color: var(--alert) }
+.log .none{ display: block; padding: 6px 0; border: 0 }
+
+@media (max-width: 900px){
+  .status{ grid-template-columns: 1fr }
+  .ring{ display: none }
+  .grid{ grid-template-columns: 1fr }
+  .bar .chips{ display: none }
+}
+@media (prefers-reduced-motion: reduce){ *, *::before, *::after{ animation: none !important; transition: none !important } }
+</style>
+</head>
+<body data-state="idle" data-input="mic">
+
+<div class="bar">
+  <span class="mark">DRONA</span>
+  <div class="chips">
+    <span class="chip" id="chip-audio"><i></i>Acoustic</span>
+    <span class="chip" id="chip-radio"><i></i>Radio</span>
+  </div>
+  <span class="spacer"></span>
+  <span class="chip" id="chip-link"><i></i><span>Link</span></span>
+  <span class="clock" id="clock"></span>
+</div>
+
+<div class="flag" id="flag" role="status" aria-live="polite"><div><div class="inner">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>
+  <p id="flag-text"></p>
+  <button class="btn alert" id="flag-ok">Mark reviewed</button>
+</div></div></div>
+
+<main style="display:flex;flex-direction:column;flex:1">
+  <section class="status">
+    <div>
+      <span class="label" id="eyebrow">Acoustic detection</span>
+      <h1 id="headline">Standby</h1>
+      <div class="tags" id="tags"></div>
+      <div class="controls">
+        <div class="seg" role="radiogroup" aria-label="Sound source">
+          <input type="radio" name="src" id="src-mic" value="mic" checked><label for="src-mic">Microphone</label>
+          <input type="radio" name="src" id="src-file" value="file"><label for="src-file">File</label>
+        </div>
+        <span class="file"><label id="drop"><input type="file" id="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.flac,.ogg,.webm"><span id="drop-text">Choose recording</span></label></span>
+        <button class="btn primary" id="go" disabled>Start</button>
+      </div>
+      <div class="progress"><i id="progress"></i></div>
+    </div>
+    <div class="ring" id="ring" aria-hidden="true">
+      <span></span><span></span><span></span><div class="level"></div><div class="core"></div>
+      <i class="tick"></i><i class="tick b"></i><i class="tick l"></i><i class="tick r"></i>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="panel wide">
+      <header><span class="label">Acoustic spectrum</span><span class="label" id="audio-state"></span></header>
+      <div class="spec audio"><canvas id="spec"></canvas><div class="idle label">No input</div></div>
+    </section>
+
+    <section class="panel">
+      <header><span class="label">Radio · 2.4 GHz · recorded replay</span><span class="label" id="radio-state">Off</span></header>
+      <div class="radio-row">
+        <select id="rf-src" aria-label="Recorded radio signal"><option value="">Off</option></select>
+      </div>
+      <div class="spec radio"><canvas id="rfspec"></canvas><div class="idle label">Off</div></div>
+    </section>
+
+    <section class="panel">
+      <header><span class="label">Detections</span></header>
+      <ol class="log" id="log"><li class="none label">None</li></ol>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const body = document.body;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// ---------- clock ----------
+const tick = () => { $("clock").textContent = new Date().toISOString().slice(11, 19) + " UTC"; };
+tick(); setInterval(tick, 1000);
+
+// ---------- state ----------
+// audio is the primary channel; radio is secondary. The headline shows the more
+// serious of the two, and the tags say which channel(s) are calling it.
+let audioV = "idle", audioU = false, radioV = "idle", radioU = false;
+const RANK = { idle: 0, clear: 1, maybe: 2, drone: 3 };
+const HEAD = { idle: "Standby", clear: "Clear", maybe: "Possible drone", drone: "Drone detected" };
+let shown = "";
+function refresh(){
+  const active = running || rfKey;
+  let v = !active ? "idle" : (RANK[audioV] >= RANK[radioV] ? audioV : radioV);
+  if (active && v === "idle") v = "clear";
+  const unknown = (audioV === "drone" && audioU) || (radioV === "drone" && radioU);
+  body.dataset.state = v; body.dataset.unknown = unknown ? "1" : "0";
+  const h = (v === "drone" && unknown) ? "Unknown drone" : HEAD[v];
+  if (h !== shown) { shown = h; const el = $("headline"); el.textContent = h; el.classList.remove("swap"); void el.offsetWidth; el.classList.add("swap"); }
+  const srcs = [];
+  if (audioV === "drone") srcs.push("Acoustic");
+  if (radioV === "drone") srcs.push("Radio");
+  $("tags").innerHTML = v === "drone" ? srcs.map(s => `<span class="chip tone">${s}</span>`).join("")
+    : (quiet && running && body.dataset.input === "mic" ? `<span class="chip">Low input level</span>` : "");
+  $("chip-audio").className = "chip " + (audioV === "drone" ? "hit" : running ? "live" : "");
+  $("chip-radio").className = "chip " + (radioV === "drone" ? "hit" : rfKey ? "live" : "");
+  if (!running) $("eyebrow").textContent = rfKey ? "Radio · " + rfName : "Acoustic detection";
+  $("audio-state").textContent = running ? { idle: "Listening", clear: "Clear", maybe: "Possible", drone: "Drone" }[audioV] : "";
+  $("radio-state").textContent = rfKey ? { idle: "Tuning", clear: "Clear", maybe: "Possible", drone: "Drone" }[radioV] : "Off";
+  if (v === "drone") openEpisode(srcs, unknown); else closeEpisode();
+}
+
+// ---------- socket ----------
+let ws = null, wsReady = false;
+function connect(){
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  ws.binaryType = "arraybuffer";
+  ws.onopen = () => {
+    wsReady = true; $("chip-link").className = "chip live"; $("chip-link").lastChild.textContent = "Link";
+    $("go").disabled = body.dataset.input === "file" && !fileBuf;
+    if (running) ws.send(JSON.stringify({ type: "start", rate: ctx.sampleRate, input: body.dataset.input }));
+    if (rfKey) ws.send(JSON.stringify({ type: "rf", source: rfKey }));
+  };
+  ws.onclose = () => {
+    wsReady = false; $("chip-link").className = "chip hit"; $("chip-link").lastChild.textContent = "No link";
+    setTimeout(connect, 1500);
+  };
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === "audio" && running) { audioV = m.verdict; audioU = m.unfamiliar; refresh(); }
+    if (m.type === "radio" && rfKey) { radioV = m.verdict; radioU = m.unfamiliar; drawRadio(m); refresh(); }
+  };
+}
+connect();
+
+// ---------- audio ----------
+const TAP = `class Tap extends AudioWorkletProcessor{
+  constructor(){ super(); this.buf = new Float32Array(4096); this.n = 0; }
+  process(inputs){ const ch = inputs[0][0]; if (ch){ for (let i = 0; i < ch.length; i++){ this.buf[this.n++] = ch[i];
+    if (this.n === this.buf.length){ this.port.postMessage(this.buf.slice(0)); this.n = 0; } } } return true; } }
+  registerProcessor("tap", Tap);`;
+let ctx = null, tap = null, analyser = null, source = null, stream = null, running = false;
+let fileBuf = null, fileName = "", startedAt = 0, quiet = false;
+
+async function ensureAudio(){
+  if (ctx) { if (ctx.state === "suspended") await ctx.resume(); return; }
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: "application/javascript" })));
+  tap = new AudioWorkletNode(ctx, "tap");
+  const mute = ctx.createGain(); mute.gain.value = 0; tap.connect(mute).connect(ctx.destination);
+  tap.port.onmessage = e => { if (running && wsReady) ws.send(e.data.buffer); };
+  analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.55;
+}
+
+async function start(){
+  await ensureAudio();
+  const input = body.dataset.input;
+  try {
+    if (input === "mic") {
+      // voice processing would filter out rotor hum
+      stream = await navigator.mediaDevices.getUserMedia({ audio: {
+        echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+      source = ctx.createMediaStreamSource(stream);
+    } else {
+      if (!fileBuf) return;
+      source = ctx.createBufferSource(); source.buffer = fileBuf;
+      source.connect(ctx.destination);
+      source.onended = () => { if (running) stop(); };
+    }
+  } catch (e) {
+    $("tags").innerHTML = `<span class="chip hit">Microphone blocked</span>`; return;
+  }
+  source.connect(analyser); source.connect(tap);
+  ws.send(JSON.stringify({ type: "start", rate: ctx.sampleRate, input }));
+  running = true; startedAt = ctx.currentTime; audioV = "idle"; audioU = false;
+  body.classList.add("running", "used");
+  if (input === "file") source.start();
+  $("eyebrow").textContent = input === "mic" ? "Acoustic · microphone" : "Acoustic · " + fileName;
+  $("go").textContent = "Stop"; refresh();
+}
+
+function stop(){
+  running = false; body.classList.remove("running");
+  if (wsReady) ws.send(JSON.stringify({ type: "stop" }));
+  try { if (source) { source.disconnect(); if (source.stop) source.stop(); } } catch (e) {}
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  source = null; audioV = "idle"; audioU = false; quiet = false;
+  $("eyebrow").textContent = "Acoustic detection"; $("go").textContent = "Start"; refresh();
+}
+
+$("go").onclick = () => running ? stop() : start();
+addEventListener("keydown", e => {                       // space: start / stop
+  if (e.code !== "Space" || e.repeat || /^(INPUT|SELECT|BUTTON)$/.test(document.activeElement.tagName)) return;
+  e.preventDefault(); if (!$("go").disabled) $("go").click();
+});
+document.querySelectorAll('input[name="src"]').forEach(r => r.onchange = () => {
+  if (running) stop();
+  body.dataset.input = r.value;
+  $("go").disabled = !wsReady || (r.value === "file" && !fileBuf);
+});
+async function loadFile(f){
+  if (!f) return;
+  if (running) stop();
+  await ensureAudio();
+  $("drop-text").textContent = "Opening…";
+  try {
+    fileBuf = await ctx.decodeAudioData(await f.arrayBuffer());
+    fileName = f.name.replace(/\.[^.]+$/, "");
+    $("drop-text").textContent = fileName; $("go").disabled = !wsReady;
+  } catch (e) { fileBuf = null; $("go").disabled = true; $("drop-text").textContent = "Unsupported file"; }
+}
+$("file").onchange = e => loadFile(e.target.files[0]);
+const drop = $("drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => loadFile(e.dataTransfer.files[0]));
+
+// ---------- radio (secondary) ----------
+let rfKey = "", rfName = "";
+fetch("/rf/scenes").then(r => r.json()).then(list => {
+  const sel = $("rf-src");
+  if (!list.length) { sel.options[0].textContent = "Unavailable"; sel.disabled = true; return; }
+  for (const [g, name] of [["Drone", "Drone"], ["No drone", "No drone"]]) {
+    const og = document.createElement("optgroup"); og.label = name;
+    list.filter(x => x.group === g).forEach(x => og.append(new Option(x.name, x.key)));
+    sel.append(og);
+  }
+}).catch(() => {});
+$("rf-src").onchange = e => {
+  rfKey = e.target.value; rfName = rfKey ? e.target.selectedOptions[0].textContent : "";
+  body.classList.toggle("rfon", !!rfKey);
+  radioV = "idle"; radioU = false;
+  rfCtx.clearRect(0, 0, rfCanvas.width, rfCanvas.height);
+  if (wsReady) ws.send(JSON.stringify({ type: "rf", source: rfKey || null }));
+  refresh();
+};
+const rfCanvas = $("rfspec"), rfCtx = rfCanvas.getContext("2d");
+function drawRadio(m){
+  const W = rfCanvas.width, H = rfCanvas.height, step = Math.round(8 * (devicePixelRatio || 1));
+  rfCtx.globalCompositeOperation = "copy"; rfCtx.drawImage(rfCanvas, -step, 0);
+  rfCtx.globalCompositeOperation = "source-over";
+  rfCtx.fillStyle = getComputedStyle(body).getPropertyValue(m.verdict === "drone" ? "--alert" : "--ink").trim();
+  const n = m.column.length, rowH = H / n;
+  m.column.forEach((v, i) => {
+    const a = Math.pow(v / 255, 1.5) * 0.85;
+    if (a > 0.03) { rfCtx.globalAlpha = a; rfCtx.fillRect(W - step, H - (i + 1) * rowH, step, Math.ceil(rowH)); }
+  });
+  rfCtx.globalAlpha = 1;
+}
+
+// ---------- detections + flag ----------
+let flags = [];
+try { flags = JSON.parse(localStorage.getItem("drona-flags-v2") || "[]"); } catch (e) { flags = []; }
+const saveFlags = () => { try { localStorage.setItem("drona-flags-v2", JSON.stringify(flags)); } catch (e) {} };
+const hhmm = d => d.toISOString().slice(11, 19) + " UTC";
+function showFlags(){
+  const open = flags.filter(f => !f.reviewed);
+  $("flag").classList.toggle("on", open.length > 0);
+  document.title = open.length ? "⚑ Drone detected · Drona" : "Drona";
+  if (!open.length) return;
+  const f = open[open.length - 1];
+  $("flag-text").innerHTML = `${f.unknown ? "Unknown drone" : "Drone detected"} · ${esc(f.time)}
+    <span>${f.via ? "· " + esc(f.via) : ""}${open.length > 1 ? ` · ${open.length - 1} more unreviewed` : ""}</span>`;
+}
+$("flag-ok").onclick = () => { flags.forEach(f => f.reviewed = true); saveFlags(); showFlags(); renderEpisode(); document.querySelectorAll(".log .f").forEach(e => e.remove()); };
+showFlags();
+
+let episode = null;
+function sourceName(){ return running ? (body.dataset.input === "mic" ? "Microphone" : fileName) : rfName; }
+function openEpisode(srcs, unknown){
+  if (!episode) {
+    episode = { start: new Date(), srcs: new Set(), unknown, from: sourceName() };
+    $("log").querySelector(".none")?.remove();
+    episode.el = document.createElement("li"); $("log").prepend(episode.el);
+    episode.flag = { time: hhmm(episode.start), via: "", unknown, reviewed: false };
+    flags.push(episode.flag); flags = flags.slice(-50);
+  }
+  srcs.forEach(s => episode.srcs.add(s));
+  episode.unknown ||= unknown;
+  episode.flag.unknown = episode.unknown;
+  episode.flag.via = [...episode.srcs].join(" + ") + " · " + episode.from;
+  saveFlags(); showFlags(); renderEpisode();
+}
+function closeEpisode(){ if (!episode) return; episode.end = new Date(); renderEpisode(); episode = null; }
+function dur(ms){ const s = ms / 1000; return s < 4 ? "brief" : s < 20 ? "seconds" : s < 60 ? "under a minute" : "over a minute"; }
+function renderEpisode(){
+  const e = episode; if (!e) return;
+  e.el.className = (e.unknown ? "unknown " : "") + (e.end ? "" : "now");
+  e.el.innerHTML = `<i></i><div><b>${e.unknown ? "Unknown drone" : "Drone"}</b>${e.flag.reviewed ? "" : `<span class="f">FLAGGED</span>`}
+    <small>${esc([...e.srcs].join(" + "))} · ${esc(e.from)}${e.end ? " · " + dur(e.end - e.start) : ""}</small></div>
+    <time>${e.end ? hhmm(e.start).slice(0, 5) : "LIVE"}</time>`;
+}
+
+// ---------- acoustic spectrum + level ----------
+const spec = $("spec"), sctx = spec.getContext("2d");
+function fit(c){ const r = c.getBoundingClientRect(), d = devicePixelRatio || 1; c.width = r.width * d; c.height = r.height * d; }
+const fitAll = () => { fit(spec); fit(rfCanvas); };
+addEventListener("resize", fitAll); fitAll();
+let freq = null, wave = null, level = 0, quietFor = 0, lastT = performance.now();
+function draw(t){
+  const dt = (t - lastT) / 1000; lastT = t;
+  if (running && analyser) {
+    freq ||= new Uint8Array(analyser.frequencyBinCount);
+    wave ||= new Float32Array(analyser.fftSize);
+    analyser.getByteFrequencyData(freq); analyser.getFloatTimeDomainData(wave);
+    let ss = 0; for (const v of wave) ss += v * v;
+    const rms = Math.sqrt(ss / wave.length);
+    level += (Math.min(1, rms * 9) - level) * 0.25;
+    quietFor = rms < 0.004 ? quietFor + dt : 0;
+    const q = quietFor > 3; if (q !== quiet) { quiet = q; refresh(); }
+
+    const W = spec.width, H = spec.height, step = Math.max(2, Math.round((devicePixelRatio || 1) * 2));
+    sctx.globalCompositeOperation = "copy"; sctx.drawImage(spec, -step, 0);
+    sctx.globalCompositeOperation = "source-over";
+    const maxBin = Math.floor(8000 / (ctx.sampleRate / 2) * freq.length);
+    sctx.fillStyle = getComputedStyle(body).getPropertyValue(audioV === "drone" ? "--alert" : "--ink").trim();
+    const col = Array.from(freq.subarray(0, maxBin)).sort((a, b) => a - b);
+    const floor = col[Math.floor(col.length * 0.5)], top = Math.max(floor + 40, col[col.length - 1]);
+    for (let y = 0; y < H; y++) {
+      const bin = Math.min(maxBin - 1, Math.floor(Math.pow(1 - y / H, 1.8) * maxBin));
+      const a = Math.pow(Math.max(0, (freq[bin] - floor) / (top - floor)), 1.4) * 0.9;
+      if (a > 0.02) { sctx.globalAlpha = a; sctx.fillRect(W - step, y, step, 1); }
+    }
+    sctx.globalAlpha = 1;
+    if (body.dataset.input === "file" && source && source.buffer)
+      $("progress").style.transform = `scaleX(${Math.min(1, (ctx.currentTime - startedAt) / source.buffer.duration)})`;
+  } else level *= 0.9;
+  $("ring").style.setProperty("--level", level.toFixed(3));
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+refresh();
+</script>
+</body>
+</html>

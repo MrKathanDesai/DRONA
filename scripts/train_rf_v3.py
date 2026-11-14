@@ -35,6 +35,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import average_precision_score
 
 from dronedet.data import rf_emitters as RE
 from dronedet.data import rf_noise as RN
@@ -106,8 +107,7 @@ def summary(df_te, p, thr):
     hit = p >= thr
     return {"recall": float(hit[y == 1].mean()), "fpr": float(hit[y == 0].mean()),
             "false_alarms": int(hit[y == 0].sum()), "negatives": int((y == 0).sum()),
-            "pr_auc": float(E.average_precision_score(y, p))
-            if hasattr(E, "average_precision_score") else None}
+            "pr_auc": float(average_precision_score(y, p))}
 
 
 # --- part 4: time-frequency features on raw Tampere IQ -----------------------
@@ -177,9 +177,6 @@ def tf_experiment():
 
 
 def main() -> int:
-    from sklearn.metrics import average_precision_score
-    E.average_precision_score = average_precision_score
-
     print("building v2 dataset + synthetic emitters ...", flush=True)
     X, df = V2.build()
     X, df = add_emitters(X, df)

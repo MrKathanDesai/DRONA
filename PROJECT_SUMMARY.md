@@ -14,6 +14,8 @@
 | **Uncertainty / open set** | Done for audio and RF. Four states per window. The review band catches most errors; the unseen-drone flag works for audio (AUROC 0.81) and for RF Bebop / Phantom (0.97) but not RF AR (0.45). |
 | **Fusion** | Done (section 7d). Calibrated evidence, summed; audio-only vs RF-only vs fused ablation. RF v2 carries most of the detection; the sum keeps audio's recall for an RF-silent drone and cuts helicopter false alarms. |
 | **Dashboard** | Done. `streamlit run app/dashboard.py`: live-feed replay, states, Grad-CAM, optional RF feed with fused state. |
+| **Live page** | Done. `python -m console`: microphone or audio file, with a secondary panel replaying recorded radio. Alarm rule calibrated on validation recordings: alarms on 57% of outdoor test drone recordings for 1.7% of background ones (`live_calibration.md`). |
+| **Played-back sound** | A detector trained with simulated speaker -> microphone copies catches 61% vs 44% of drone windows played through a speaker (simulated), but less on clean audio, so it is opt-in (`mic_robustness.md`). |
 | **Outdoor confusers (audio)** | Svanström helicopter/background negatives in training cut window false alarms, with lower recall (`svanstrom_confusers.md`). |
 
 > **Do not claim "99–100% RF detection accuracy".**

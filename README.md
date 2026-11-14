@@ -1,7 +1,12 @@
 # dronedet
 
-Acoustic + RF drone detection — a dataset-only project. No hardware required.
-`PROJECT_SUMMARY.md` has every result in one place.
+Acoustic + RF drone detection, built and evaluated on public datasets. No special hardware:
+the live page runs on a laptop microphone. `PROJECT_SUMMARY.md` has every result in one place.
+
+```bash
+python -m console                  # live detection page, http://localhost:8080
+streamlit run app/dashboard.py     # results and evaluation dashboard
+```
 
 ## Status
 
@@ -25,9 +30,12 @@ Acoustic + RF drone detection — a dataset-only project. No hardware required.
 | 10b | RF v2: relabelled silence, receiver-noise negatives, second-receiver drones | **done: noise is "no drone", 9/10 unseen drones caught** — see `reports/rf_v2.md` |
 | 11 | Audio + RF fusion, ablation, dashboard RF panel | **done** — see `reports/fusion.md` |
 | 12 | Real speech + music in the noise test | **done** — in `reports/noise_robustness.md` |
-| 10c | RF v3 experiment: simulated Wi-Fi / Bluetooth / microwave negatives, forest vs 1D-CNN, 3-of-5 smoothing, time-frequency features | **done** — see `reports/rf_v3.md` |
-| 10d | RF probability calibration + held-out Phantom (Vidhi) | **done** — see `reports/rf_trust.md` |
+| 12b | RF v3 experiment: simulated Wi-Fi / Bluetooth / microwave negatives, forest vs 1D-CNN, 3-of-5 smoothing, time-frequency features | **done** — see `reports/rf_v3.md` |
+| 12c | RF probability calibration + held-out Phantom (Vidhi) | **done** — see `reports/rf_trust.md` |
 | 13 | Audio baseline + 2D CNN, synthetic white/pink noise, Svanström confuser training, DroneDetect subset (Vidhi) | **done** — see `reports/audio_cnn.json`, `reports/svanstrom_confusers.md`, `reports/dronedetect_subset.md` |
+| 14 | Live detection page: microphone / file, recorded radio panel, flags | **done** — `python -m console` |
+| 14b | Live alarm rule calibrated on validation recordings | **done: alarm on the first drone window** — see `reports/live_calibration.md` |
+| 14c | Detector trained on simulated speaker -> microphone playback | **done, opt-in** — see `reports/mic_robustness.md` |
 | next | Real Wi-Fi / Bluetooth recordings (CardRF / DroneDetect) to measure RF false alarms on real traffic | needs a DataPort / CardRF login |
 
 ## Setup
@@ -36,7 +44,7 @@ macOS ships a Homebrew Python that refuses system-wide installs (PEP 668),
 so the project uses a virtual environment. Do this once:
 
 ```bash
-cd /Users/kathandesai/drone
+cd DRONA                      # the cloned repository
 python3 -m venv .venv
 source .venv/bin/activate          # every new terminal needs this line
 pip install -r requirements.txt
@@ -89,6 +97,42 @@ everything (~985 MB) with `python scripts/download_data.py`; add `--extra`
 for real speech/music noise (1.6 GB) and the Tampere RF recordings (5.3 GB).
 See `data/README.md` for provenance. Long runs: keep the Mac awake
 (`caffeinate -i python scripts/train_deep.py`), or sleep stretches them to hours.
+
+## Live detection page
+
+`console/` is the live view: one dark screen, acoustic detection first, radio
+second. No metrics.
+
+```bash
+pip install -r console/requirements.txt
+python -m console                       # http://localhost:8080
+python -m console --mic-model speaker   # mic uses the playback-trained detector
+```
+
+- **Acoustic (primary):** microphone or an audio file (it plays out loud and is
+  checked as it plays). The browser's voice processing is switched off so rotor
+  hum is not filtered out.
+- **Radio (secondary):** a laptop cannot receive drone radio (its Wi-Fi chip
+  only hands over decoded Wi-Fi packets, not the raw 2.4 GHz spectrum), so the
+  panel replays recorded 2.4 GHz captures from the held-out test split, scored
+  by the deployed RF v2 detector. It is judged independently of the sound: the
+  replay has nothing to do with what the microphone hears, so the two are not
+  fused here (the fusion ablation is in `reports/fusion.md`). Live radio needs a
+  software-defined radio covering 2.4 GHz, such as a HackRF One or ADALM-Pluto.
+- The headline shows the more serious of the two channels and which one called
+  it. Every detection raises a flag that stays until someone marks it reviewed.
+- Alarm rule: one decision per second; "drone" on the first drone window, held
+  for three. Chosen on validation recordings by `scripts/calibrate_live.py`:
+  it alarms on 93% of validation drone recordings (57% of outdoor test drone
+  recordings, against 27% for a two-in-a-row rule) for 1.4% of background
+  recordings (`reports/live_calibration.md`).
+
+Hosting: `python -m console --host 0.0.0.0`, or
+`docker build -t drona . && docker run -p 8080:8080 -v "$PWD/data:/app/data" drona`.
+Browsers allow the microphone only on `https://` or `localhost`.
+
+The Streamlit app (`streamlit run app/dashboard.py`) stays as the separate
+results and evaluation dashboard.
 
 ## What the data is
 

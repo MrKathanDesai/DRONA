@@ -1,0 +1,59 @@
+{
+  "hold": 3,
+  "keep": 0.9,
+  "chosen_confirm": 1,
+  "results": {
+    "validation": {
+      "1": {
+        "drone_recordings_alarmed": 0.9285714285714286,
+        "background_recordings_alarmed": 0.0136986301369863,
+        "drone_recordings": 56,
+        "background_recordings": 292
+      },
+      "2": {
+        "drone_recordings_alarmed": 0.6071428571428571,
+        "background_recordings_alarmed": 0.0,
+        "drone_recordings": 56,
+        "background_recordings": 292
+      },
+      "3": {
+        "drone_recordings_alarmed": 0.5535714285714286,
+        "background_recordings_alarmed": 0.0,
+        "drone_recordings": 56,
+        "background_recordings": 292
+      },
+      "4": {
+        "drone_recordings_alarmed": 0.48214285714285715,
+        "background_recordings_alarmed": 0.0,
+        "drone_recordings": 56,
+        "background_recordings": 292
+      }
+    },
+    "test (outdoor Svanstr\u00f6m)": {
+      "1": {
+        "drone_recordings_alarmed": 0.5666666666666667,
+        "background_recordings_alarmed": 0.016666666666666666,
+        "drone_recordings": 30,
+        "background_recordings": 60
+      },
+      "2": {
+        "drone_recordings_alarmed": 0.26666666666666666,
+        "background_recordings_alarmed": 0.0,
+        "drone_recordings": 30,
+        "background_recordings": 60
+      },
+      "3": {
+        "drone_recordings_alarmed": 0.1,
+        "background_recordings_alarmed": 0.0,
+        "drone_recordings": 30,
+        "background_recordings": 60
+      },
+      "4": {
+        "drone_recordings_alarmed": 0.1,
+        "background_recordings_alarmed": 0.0,
+        "drone_recordings": 30,
+        "background_recordings": 60
+      }
+    }
+  }
+}

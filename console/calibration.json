@@ -1,0 +1,5 @@
+{
+  "confirm": 1,
+  "hold": 3,
+  "source": "scripts/calibrate_live.py"
+}

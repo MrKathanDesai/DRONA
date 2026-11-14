@@ -31,6 +31,12 @@ Combined work from branches `001-vidhi` (Vidhi) and `002` (Kathan).
 - **DroneDetect subset:** Vidhi; 2-model classification only, no background (`dronedetect_subset.md`).
 - **Uncertainty / unknown-drone flags and which-drone confusion matrices:** Kathan.
 
+## Live page
+- `python -m console`: acoustic detection from the microphone or a file, with a
+  recorded-radio panel judged separately, and flags that persist until reviewed: Kathan.
+- Alarm rule calibrated on validation recordings (`live_calibration.md`).
+- Opt-in detector trained on simulated speaker -> microphone playback (`mic_robustness.md`).
+
 ## Fusion and dashboard
 - **Audio + RF fusion ablation** (sum rule and learned logistic regression): Kathan (`fusion.md`).
   An upper bound, since audio and RF pairs are not co-recorded.
@@ -38,7 +44,7 @@ Combined work from branches `001-vidhi` (Vidhi) and `002` (Kathan).
   and the fusion results merged in. `streamlit run app/dashboard.py`.
 
 ## Tests
-- 125 passing (`python -m pytest -q`).
+- 130 passing (`python -m pytest -q`).
 
 ## Still open
 - Real Wi-Fi / Bluetooth RF recordings (CardRF / DroneDetect need a login) to

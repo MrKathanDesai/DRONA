@@ -78,7 +78,7 @@ One-time setup (macOS Homebrew Python refuses system-wide installs, so a
 virtual environment is used):
 
 ```bash
-cd /Users/kathandesai/drone
+cd DRONA                      # the cloned repository
 python3 -m venv .venv
 source .venv/bin/activate          # needed in every new terminal
 pip install -r requirements.txt
