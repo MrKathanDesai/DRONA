@@ -166,7 +166,7 @@ def _text(at) -> str:
 
 def test_dashboard_renders_without_exceptions(app):
     assert not app.exception, [e.value for e in app.exception]
-    assert [t.label for t in app.tabs][:3] == ["Project briefing", "Replay detector", "Fusion"]
+    assert [t.label for t in app.tabs][:3] == ["Replay detector", "Project briefing", "Fusion"]
 
 
 def test_dashboard_shows_states_caveats_and_readiness(app):
@@ -191,7 +191,7 @@ def test_theme_control_present(app):
 
 
 def test_every_input_source_is_offered(app):
-    source = next(r for r in app.sidebar.radio if r.label == "Source")
+    source = next(r for r in app.main.selectbox if r.label == "Source")  # inside ACOUSTIC-01
     assert list(source.options) == [
         "Svanström outdoor", "DroneAudioDataset", "ITU ARIS Lab",
         "Upload audio or video", "Paste a link (YouTube, …)", "Record with microphone"]
@@ -209,7 +209,7 @@ def test_replay_puts_the_result_first_and_labels_audio_only():
     testing = pytest.importorskip("streamlit.testing.v1")
     at = testing.AppTest.from_file(str(ROOT / "app" / "dashboard.py"), default_timeout=600)
     at.run()
-    clip = next(s for s in at.sidebar.selectbox if s.label == "Recording / clip")
+    clip = next(s for s in at.main.selectbox if s.label == "Recording / clip")
     clip.select_index(1).run()                    # first real Svanström drone recording
     assert not at.exception, [e.value for e in at.exception]
     html = "\n".join(str(m.value) for m in at.markdown)
@@ -220,8 +220,9 @@ def test_replay_puts_the_result_first_and_labels_audio_only():
     assert "Final · audio only" in html and "Not used" in html     # RF tile is off
     captions = "\n".join(str(c.value) for c in at.caption)
     assert "not calibrated probabilities" in captions
-    # Inputs live in the shared sidebar, so every tab says where the result is.
-    assert any("Open the **Replay detector** tab" in str(s.value) for s in at.success)
+    # The console layout: sensor tiles, coverage map, incidents.
+    assert "Acoustic-01" in html and "Radio-01" in html and "Sensor coverage" in html
+    assert "INC-0001" in html
     # The console-style top bar's badge shows that recording's final state.
     badge = re.search(r'class="threat"[^>]*>([A-Za-z ]+)</span>', html)
     assert badge and badge.group(1) == shown.group(1)
@@ -242,13 +243,13 @@ def test_replay_with_rf_shows_fused_final_decision():
     testing = pytest.importorskip("streamlit.testing.v1")
     at = testing.AppTest.from_file(str(ROOT / "app" / "dashboard.py"), default_timeout=600)
     at.run()
-    rf = next(s for s in at.sidebar.selectbox
+    rf = next(s for s in at.main.selectbox
               if s.label == "Replay recorded RF test windows from")
     drone_rf = next(o for o in rf.options if o.startswith("DroneRF drone"))
     rf.set_value(drone_rf).run()
-    method = next(r for r in at.sidebar.radio if r.label == "Fusion rule")
+    method = next(r for r in at.main.radio if r.label == "Fusion rule")
     assert method.value == "sum"                         # deployed rule is the default
-    clip = next(s for s in at.sidebar.selectbox if s.label == "Recording / clip")
+    clip = next(s for s in at.main.selectbox if s.label == "Recording / clip")
     clip.select_index(1).run()
     assert not at.exception, [e.value for e in at.exception]
     html = "\n".join(str(m.value) for m in at.markdown)
