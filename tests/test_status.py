@@ -222,6 +222,15 @@ def test_replay_puts_the_result_first_and_labels_audio_only():
     assert "not calibrated probabilities" in captions
     # Inputs live in the shared sidebar, so every tab says where the result is.
     assert any("Open the **Replay detector** tab" in str(s.value) for s in at.success)
+    # The console-style top bar's badge shows that recording's final state.
+    badge = re.search(r'class="threat"[^>]*>([A-Za-z ]+)</span>', html)
+    assert badge and badge.group(1) == shown.group(1)
+
+
+def test_top_bar_is_on_standby_without_a_clip(app):
+    html = "\n".join(str(m.value) for m in app.markdown)
+    assert 'class="mark">DRONA</span>' in html
+    assert re.search(r'class="threat"[^>]*>Standby</span>', html)
 
 
 @pytest.mark.skipif(not (ROOT / "data" / "models" / "rf_detector.joblib").exists()
