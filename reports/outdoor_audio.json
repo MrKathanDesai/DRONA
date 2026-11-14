@@ -14,6 +14,19 @@
       "fpr": 0.01,
       "false_alarms": 6,
       "negatives": 600,
+      "accuracy": 0.7333333333333333,
+      "precision": 0.9166666666666666,
+      "f1": 0.3548387096774193,
+      "confusion": [
+        [
+          594,
+          6
+        ],
+        [
+          234,
+          66
+        ]
+      ],
       "val_recall": 0.5918604651162791,
       "drone_vs_helicopter_roc": 0.5838555555555555
     },
@@ -30,6 +43,19 @@
       "fpr": 0.008333333333333333,
       "false_alarms": 5,
       "negatives": 600,
+      "accuracy": 0.7411111111111112,
+      "precision": 0.935064935064935,
+      "f1": 0.3819628647214854,
+      "confusion": [
+        [
+          595,
+          5
+        ],
+        [
+          228,
+          72
+        ]
+      ],
       "val_recall": 0.8511627906976744,
       "drone_vs_helicopter_roc": 0.6344222222222222
     },
@@ -46,6 +72,19 @@
       "fpr": 0.0,
       "false_alarms": 0,
       "negatives": 600,
+      "accuracy": 0.6822222222222222,
+      "precision": 1.0,
+      "f1": 0.089171974522293,
+      "confusion": [
+        [
+          600,
+          0
+        ],
+        [
+          286,
+          14
+        ]
+      ],
       "val_recall": 0.40930232558139534,
       "drone_vs_helicopter_roc": 0.7438222222222222
     },
@@ -62,6 +101,19 @@
       "fpr": 0.0,
       "false_alarms": 0,
       "negatives": 600,
+      "accuracy": 0.6922222222222222,
+      "precision": 1.0,
+      "f1": 0.14241486068111453,
+      "confusion": [
+        [
+          600,
+          0
+        ],
+        [
+          277,
+          23
+        ]
+      ],
       "val_recall": 0.8209302325581396,
       "drone_vs_helicopter_roc": 0.725988888888889
     }

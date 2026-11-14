@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""Which drone? Per-class confusion matrices for audio and RF.
+
+    python scripts/eval_identify.py
+
+Audio: background vs Bebop vs Mambo on the tier-1 split (held-out
+recordings), multinomial logistic regression on the frozen pretrained
+embeddings. RF: background vs Bebop vs AR vs Phantom on DroneRF's tier-1
+split (held-out time), the deployed forest's features. Both corpora hold only
+these drones, so identification is closed-set: a drone outside them is the
+open-set flags' job (uncertainty_audio.md, rf_uncertainty.md).
+
+Writes reports/identify.{json,md} and reports/figures/11_confusion_matrices.png.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import balanced_accuracy_score, confusion_matrix, f1_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+from dronedet.models import pretrained as PT
+from dronedet.models import rf as M
+from dronedet.paths import DATA_DIR
+from make_figures import BLUE, INK, INK2, REPORTS, SURFACE, save
+
+AUDIO_CLASSES = ["background", "bebop", "mambo"]
+RF_CLASSES = ["background", "bebop", "ar", "phantom"]
+
+
+def audio():
+    E = np.load(DATA_DIR / "embeddings" / "E.npy")
+    df = pd.read_parquet(DATA_DIR / "embeddings" / "index.parquet")
+    # the manifest spells Mambo "membo", as the source dataset's folders do
+    y = df.drone_model.replace({"membo": "mambo"}).fillna("background").values
+    tr, te = (df.split_tier1 == "train").values, (df.split_tier1 == "test").values
+    model = make_pipeline(StandardScaler(), LogisticRegression(
+        C=PT.HEAD_C, class_weight="balanced", max_iter=5000)).fit(E[tr], y[tr])
+    return y[te], model.predict(E[te])
+
+
+def rf():
+    X = np.load(DATA_DIR / "rf_features" / "X.npy")
+    df = pd.read_parquet(DATA_DIR / "rf_features" / "index.parquet")
+    F = M.MODELS[M.DEPLOY][0](X)
+    y = df.drone_model.fillna("background").values
+    tr, te = (df.split_tier1 == "train").values, (df.split_tier1 == "test").values
+    model = M.forest().fit(F[tr], y[tr])
+    return y[te], model.predict(F[te])
+
+
+def summarise(y, pred, classes):
+    cm = confusion_matrix(y, pred, labels=classes)
+    return {
+        "classes": classes,
+        "confusion": cm.tolist(),
+        "accuracy": float((y == pred).mean()),
+        "balanced_accuracy": float(balanced_accuracy_score(y, pred)),
+        "macro_f1": float(f1_score(y, pred, labels=classes, average="macro")),
+        "per_class_recall": {c: float(cm[i, i] / max(cm[i].sum(), 1))
+                             for i, c in enumerate(classes)},
+    }
+
+
+def plot(results):
+    cmap = LinearSegmentedColormap.from_list("blues", [SURFACE, BLUE])
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.4))
+    for ax, (name, r) in zip(axes, results.items()):
+        cm = np.array(r["confusion"], dtype=float)
+        rate = cm / cm.sum(axis=1, keepdims=True).clip(min=1)
+        ax.imshow(rate, cmap=cmap, vmin=0, vmax=1)
+        for i in range(len(cm)):
+            for j in range(len(cm)):
+                ax.text(j, i, f"{int(cm[i, j])}\n{rate[i, j]:.0%}", ha="center",
+                        va="center", fontsize=8.5,
+                        color="white" if rate[i, j] > 0.6 else INK)
+        ax.set_xticks(range(len(cm)), r["classes"], rotation=30, ha="right")
+        ax.set_yticks(range(len(cm)), r["classes"])
+        ax.set_xlabel("predicted", color=INK2)
+        ax.set_ylabel("true", color=INK2)
+        ax.set_title(f"{name}: balanced accuracy {r['balanced_accuracy']:.2f}",
+                     color=INK, fontsize=10, loc="left")
+    fig.suptitle("Which drone? Tier-1 test (held-out recordings / time)",
+                 color=INK, x=0.01, ha="left")
+    fig.tight_layout()
+    save(fig, "11_confusion_matrices.png")
+
+
+def table(r):
+    cls = r["classes"]
+    return ["| true \\ predicted | " + " | ".join(cls) + " | recall |",
+            "|---" * (len(cls) + 2) + "|",
+            *[f"| {c} | " + " | ".join(str(v) for v in row)
+              + f" | {r['per_class_recall'][c]:.3f} |"
+              for c, row in zip(cls, r["confusion"])]]
+
+
+def main() -> int:
+    results = {"audio": summarise(*audio(), AUDIO_CLASSES),
+               "RF": summarise(*rf(), RF_CLASSES)}
+    REPORTS.mkdir(exist_ok=True)
+    (REPORTS / "identify.json").write_text(json.dumps(results, indent=2))
+    plot(results)
+    md = ["# Drone-model identification: confusion matrices", "",
+          "Closed-set: each corpus has only these drones. Tier-1 test split "
+          "(held-out recordings for audio, held-out time for RF). Generated by "
+          "`scripts/eval_identify.py`; figure `figures/11_confusion_matrices.png`.", ""]
+    for name, r in results.items():
+        md += [f"## {name}", "",
+               f"Accuracy {r['accuracy']:.3f}, balanced accuracy "
+               f"{r['balanced_accuracy']:.3f}, macro F1 {r['macro_f1']:.3f}.", "",
+               *table(r), ""]
+    md += ["Audio uses multinomial logistic regression on the frozen pretrained "
+           "embeddings; RF the forest on 128 level-free sub-band features. The RF "
+           "matrix inherits the session caveat in `rf_detection.md`.", ""]
+    (REPORTS / "identify.md").write_text("\n".join(md))
+    print("\n".join(md))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -117,3 +117,17 @@ class Encoder:
 def audioset_labels(path: Path = LABELS_CSV) -> list[str]:
     with open(path) as fh:
         return [r["display_name"] for r in csv.DictReader(fh)]
+
+
+HEAD_C = 0.01   # picked from a small grid; see scripts/train_pretrained.py
+
+
+def head(balanced: bool = True):
+    """The trained part of the detector: standardise, then logistic regression.
+    `balanced=False` is for tier 4, whose weights come from
+    `protocol.source_weights` (pass `logisticregression__sample_weight`)."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    return make_pipeline(StandardScaler(), LogisticRegression(
+        C=HEAD_C, class_weight="balanced" if balanced else None, max_iter=5000))

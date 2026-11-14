@@ -1,4 +1,5 @@
-
+"""RF models on DroneRF PSD windows: level-free features, classical models,
+and a small 1D-CNN with a scikit-learn interface."""
 from __future__ import annotations
 
 import numpy as np
@@ -12,16 +13,27 @@ from torch import nn
 
 
 def shape_features(X: np.ndarray) -> np.ndarray:
+    """Remove each band's mean dB, so receiver gain and distance are not cues."""
     return X - X.mean(axis=2, keepdims=True)
 
 
 def band_features(X: np.ndarray, n_bands: int = 64) -> np.ndarray:
+    """(N, 2, bins) -> (N, 2 * n_bands): mean of each of n_bands sub-bands."""
     parts = np.array_split(X, n_bands, axis=2)
     return np.concatenate([p.mean(axis=2) for p in parts], axis=1)
 
 
-class TinyCNN(ClassifierMixin, BaseEstimator):
+def tilt_features(X: np.ndarray) -> np.ndarray:
+    """v2b: the 128 level-free sub-bands plus one number, the mean-dB difference
+    between the two bands. One overall receiver gain cancels in it; a
+    transmitter in one half of the spectrum does not, even when it fills that
+    half flat (DroneRF's Phantom), where level-free shape alone sees noise."""
+    tilt = X[:, 0].mean(axis=-1) - X[:, 1].mean(axis=-1)
+    return np.concatenate([band_features(shape_features(X)), tilt[:, None]], axis=1)
 
+
+class TinyCNN(ClassifierMixin, BaseEstimator):
+    """~12k-parameter 1D-CNN over both bands' PSD (2 input channels)."""
 
     def __init__(self, epochs: int = 40, lr: float = 1e-3, batch: int = 64, seed: int = 0):
         self.epochs = epochs
@@ -88,6 +100,7 @@ MODELS = {
     "logreg": (lambda X: band_features(shape_features(X)), logreg),
     "forest": (lambda X: band_features(shape_features(X)), forest),
     "cnn": (shape_features, TinyCNN),
-    "forest+level": (band_features, forest),   
+    "forest+level": (band_features, forest),    # shortcut probe only
+    "forest+tilt": (tilt_features, forest),      # RF v2b, scripts/train_rf_v2.py
 }
 DEPLOY = "forest"

@@ -21,7 +21,6 @@ sys.path.insert(0, str(ROOT / "src"))
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -39,9 +38,7 @@ TARGET_FPR = 0.01
 # {pooled, fc1, tag logits} x {RMS-normalised, raw}) looking at all three
 # tiers; the pick was the best on tiers 1-2 and mid-pack on tier 3.
 HEADS = {
-    "logreg": lambda: make_pipeline(
-        StandardScaler(),
-        LogisticRegression(C=0.01, class_weight="balanced", max_iter=5000)),
+    "logreg": PT.head,
     "mlp": lambda: make_pipeline(
         StandardScaler(),
         MLPClassifier(hidden_layer_sizes=(128,), alpha=1e-2,

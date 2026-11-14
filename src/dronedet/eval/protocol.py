@@ -1,4 +1,4 @@
-"""The three evaluation tiers, shared by every model so numbers compare.
+"""The four evaluation tiers, shared by every model so numbers compare.
 
 Each tier fixes its threshold at `target_fpr` on negatives the model did not
 train on, then applies it unchanged to test.
@@ -28,9 +28,26 @@ def _scores(model, F):
     return model.predict_proba(F)[:, 1]
 
 
-def _train_val_test(F, df, tier, make_model, target_fpr):
+def source_weights(df: pd.DataFrame) -> np.ndarray:
+    """Every (source, label) cell gets equal total weight. Tier 4 mixes an
+    indoor corpus that is 88% background with ITU ARIS, which is 82% drone;
+    unweighted, "sounds outdoors" would become a drone cue."""
+    n = df.groupby(["source", "label"]).label.transform("size").values
+    w = 1.0 / n
+    return w * len(df) / w.sum()
+
+
+def _fit(model, F, y, weights, weight_param):
+    if weights is None:
+        return model.fit(F, y)
+    return model.fit(F, y, **{weight_param: weights})
+
+
+def _train_val_test(F, df, tier, make_model, target_fpr, weights=None,
+                    weight_param="sample_weight"):
     tr, va, te = (df[tier] == s for s in ("train", "val", "test"))
-    model = make_model().fit(F[tr], df.y[tr])
+    w = None if weights is None else weights(df[tr])
+    model = _fit(make_model(), F[tr], df.y[tr], w, weight_param)
     s_va, s_te = _scores(model, F[va]), _scores(model, F[te])
     thr = E.threshold_at_fpr(s_va[df.y[va].values == 0], target_fpr)
     res = E.summarize(df.y[te], s_te, df.group_id[te], thr)
@@ -45,10 +62,26 @@ def tier1(F, df, make_model: Callable, target_fpr: float):
     return res, fa
 
 
-def tier2(F, df, make_model: Callable, target_fpr: float):
+def tier2(F, df, make_model: Callable, target_fpr: float,
+          holdout: float | None = None):
     """Train on Bebop, test on Mambo. There is no val split, so the threshold
-    comes from out-of-fold scores on train, grouped by recording."""
+    comes from out-of-fold scores on train, grouped by recording.
+
+    `holdout` (e.g. 0.2) is the cheaper variant for slow models: hold out that
+    share of training recordings, fit once on the rest, take the threshold
+    from the held-out negatives and test that same model."""
     tr, te = df.split_tier2 == "train", df.split_tier2 == "test"
+    if holdout is not None:
+        from sklearn.model_selection import GroupShuffleSplit
+        idx = np.flatnonzero(tr.values)
+        fit_i, cal_i = next(GroupShuffleSplit(1, test_size=holdout, random_state=0)
+                            .split(idx, groups=df.group_id.values[idx]))
+        fit_i, cal_i = idx[fit_i], idx[cal_i]
+        y = df.y.values
+        model = make_model().fit(F[fit_i], y[fit_i])
+        s_cal = _scores(model, F[cal_i])
+        thr = E.threshold_at_fpr(s_cal[y[cal_i] == 0], target_fpr)
+        return E.summarize(df.y[te], _scores(model, F[te.values]), df.group_id[te], thr)
     oof = cross_val_predict(make_model(), F[tr], df.y[tr],
                             groups=df.group_id[tr], cv=GroupKFold(5),
                             method="predict_proba")[:, 1]
@@ -65,10 +98,19 @@ def tier3(F, df, make_model: Callable, target_fpr: float):
     return res, fa
 
 
+def tier4(F, df, make_model: Callable, target_fpr: float, weights=source_weights,
+          weight_param: str = "sample_weight"):
+    """Tier 3's outdoor test, with the outdoor ITU ARIS corpus added to
+    training. `weights(train_df)` gives per-sample weights; `weight_param` is
+    the fit() keyword that takes them (`logisticregression__sample_weight`
+    for a pipeline). Returns (results, false alarms by category, model, thr)."""
+    return _train_val_test(F, df, "split_tier4", make_model, target_fpr,
+                           weights, weight_param)
+
+
 def fit_deployable(F, df, make_model: Callable, target_fpr: float,
-                   tier: str = "split_tier3"):
-    """The model a demo should use: tier-3 training data (all indoor
-    recordings except validation), threshold from validation negatives.
-    RF has no tier 3 and passes its own tier."""
-    _, _, model, thr = _train_val_test(F, df, tier, make_model, target_fpr)
+                   tier: str = "split_tier3", **weighting):
+    """The model a demo should use: that tier's training data, threshold from
+    its validation negatives. RF has no tier 3 and passes its own tier."""
+    _, _, model, thr = _train_val_test(F, df, tier, make_model, target_fpr, **weighting)
     return model, thr

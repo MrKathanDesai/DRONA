@@ -1,0 +1,98 @@
+{
+  "threshold": 0.26169444444444456,
+  "noise_floor_db": {
+    "low": 33.8504222869873,
+    "high": 18.68605966567993
+  },
+  "quiet_above_floor_db": 7.0,
+  "windows": 480,
+  "recall_active": 1.0,
+  "active_windows": 472,
+  "quiet_windows": 8,
+  "quiet_called_drone": 1.0,
+  "quiet_median_p": 0.9017903439153439,
+  "per_drone": [
+    {
+      "drone": "DJI_inspire_2",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.720883177008177,
+      "quiet": 0
+    },
+    {
+      "drone": "DJI_matrice_100",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.8171734006734006,
+      "quiet": 0
+    },
+    {
+      "drone": "DJI_matrice_210",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.8569153439153439,
+      "quiet": 0
+    },
+    {
+      "drone": "DJI_mavic_mini",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.766587542087542,
+      "quiet": 0
+    },
+    {
+      "drone": "DJI_mavic_pro",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.7928888888888888,
+      "quiet": 0
+    },
+    {
+      "drone": "DJI_phantom_4",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.736170634920635,
+      "quiet": 0
+    },
+    {
+      "drone": "DJI_phantom_4_pro_plus",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.8476309523809522,
+      "quiet": 0
+    },
+    {
+      "drone": "Parrot_disco",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.7586031746031743,
+      "quiet": 0
+    },
+    {
+      "drone": "Parrot_mambo_control",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.7425178571428571,
+      "quiet": 0
+    },
+    {
+      "drone": "Parrot_mambo_video",
+      "windows": 40,
+      "recall": 1.0,
+      "median_p": 0.9256104497354498,
+      "quiet": 8
+    },
+    {
+      "drone": "Yuneec_typhoon_h",
+      "windows": 80,
+      "recall": 1.0,
+      "median_p": 0.7580925925925925,
+      "quiet": 0
+    }
+  ],
+  "noise_control": {
+    "windows": 40,
+    "called_drone": 1.0,
+    "median_p": 0.8758333333333334
+  }
+}

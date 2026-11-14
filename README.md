@@ -1,6 +1,7 @@
 # dronedet
 
-Acoustic drone detection — a dataset-only project. No hardware required.
+Acoustic + RF drone detection — a dataset-only project. No hardware required.
+`PROJECT_SUMMARY.md` has every result in one place.
 
 ## Status
 
@@ -15,7 +16,14 @@ Acoustic drone detection — a dataset-only project. No hardware required.
 | 5 | Uncertainty flags (review band, familiarity, ensemble) | **done** — see `reports/uncertainty_audio.md` |
 | 6 | Open-set "unknown drone" (train Bebop, test Mambo) | **done, AUROC 0.81** — same report |
 | 6b | Streamlit dashboard with Grad-CAM, `detect.py` on the tier-4 detector | **done** — `streamlit run app/dashboard.py` |
-| 7 | Second RF corpus, then audio + RF fusion | next (needs IEEE DataPort login) |
+| 7 | Audio model comparison: CNN vs CNN+GRU vs transformer, from scratch | **done** — see `reports/deep_audio.md` |
+| 8 | Which-drone confusion matrices (audio, RF) | **done** — see `reports/identify.md` |
+| 9 | RF uncertainty + unknown-signature flags | **done** — see `reports/rf_uncertainty.md` |
+| 10 | RF on a new receiver (Tampere) + white-noise control | **done: RF v1 calls pure noise "drone"** — see `reports/rf_tampere.md` |
+| 10b | RF v2: relabelled silence, receiver-noise negatives, second-receiver drones | **done: noise is "no drone", 9/10 unseen drones caught** — see `reports/rf_v2.md` |
+| 11 | Audio + RF fusion, ablation, dashboard RF panel | **done** — see `reports/fusion.md` |
+| 12 | Real speech + music in the noise test | **done** — in `reports/noise_robustness.md` |
+| next | Real Wi-Fi / Bluetooth negatives from other places, to measure RF v2's real-world false alarms | needs a Kaggle token (or DataPort / CardRF access) |
 
 ## Setup
 
@@ -40,18 +48,28 @@ python scripts/train_pretrained.py      # trains only the head (~15 s)
 python scripts/train_outdoor.py         # tier 4, needs ITU ARIS
 python scripts/eval_noise.py            # noise stress test + augmentation (~10 min)
 python scripts/eval_uncertainty.py      # flags, open set, saves the detector (~1 min)
+python scripts/train_deep.py            # CNN / CNN+GRU / transformer (~1 h awake)
+python scripts/eval_identify.py         # which-drone confusion matrices
+python scripts/prepare_rf.py            # DroneRF: 4 GB download + PSD features
+python scripts/train_rf.py              # RF detectors + quiet-window check
+python scripts/eval_rf_uncertainty.py   # RF v1 flags and open set
+python scripts/eval_rf_tampere.py       # RF v1 on a new receiver + white-noise control
+python scripts/train_rf_v2.py           # RF v2, saves data/models/rf_detector.joblib
+python scripts/eval_fusion.py           # audio + RF fusion ablation, saves fusion.joblib
 python scripts/detect.py data/raw_svanstrom/Audio/DRONE_001.wav
-streamlit run app/dashboard.py          # live-feed replay with Grad-CAM
+streamlit run app/dashboard.py          # live-feed replay, Grad-CAM, optional RF feed
 python scripts/make_figures.py          # presentation figures -> reports/figures/
-python -m pytest tests -q               # 68 tests
+python -m pytest tests -q               # 87 tests
 ```
 
 In VS Code, press ⇧⌘P → "Python: Select Interpreter" → pick the one inside
 `.venv`, so the editor and the terminal agree.
 
 The raw corpora and the pretrained checkpoint are not committed. Fetch
-everything (~985 MB) with `python scripts/download_data.py`; see
-`data/README.md` for provenance.
+everything (~985 MB) with `python scripts/download_data.py`; add `--extra`
+for real speech/music noise (1.6 GB) and the Tampere RF recordings (5.3 GB).
+See `data/README.md` for provenance. Long runs: keep the Mac awake
+(`caffeinate -i python scripts/train_deep.py`), or sleep stretches them to hours.
 
 ## What the data is
 
@@ -175,7 +193,26 @@ Every RF model scores near 1.000, including on drones it never trained on, and
 **those scores do not measure detection.** On noise-floor windows with nothing
 visibly transmitting, a forest still separates drone from background perfectly,
 which points to the recording session or receiver. See `reports/rf_detection.md`.
-RF needs a second corpus before any number here means anything.
+Run on another receiver (Tampere anechoic-chamber recordings, 11 new drones),
+the forest calls every window "drone" — and calls **pure white noise** "drone"
+too. Its rule is "not the DroneRF background recording" (`reports/rf_tampere.md`).
+**RF v2** (`scripts/train_rf_v2.py`, `reports/rf_v2.md`) fixes the data, not the
+model: DroneRF drone windows with no visible transmission are no longer labelled
+"drone"; synthetic receiver noise through both pipelines is added as negatives;
+Tampere drones from a second receiver are added as positives, split by drone. v2
+calls noise and silent windows "no drone" and catches 9 of 10 Tampere drones it
+never trained on. Still unmeasured: false alarms on real Wi-Fi / Bluetooth
+recorded outside DroneRF's lab.
+
+## Fusion
+
+Each sensor's score is calibrated to a log-likelihood ratio on its own
+validation data, capped, and summed (`src/dronedet/fusion.py`); the proposal's
+learned layer (logistic regression on the two) is reported alongside. Pairs are
+synthetic, since no corpus records both. With RF v2, fusion follows RF when
+both see a drone, keeps most of audio's recall for an RF-silent drone (the
+learned layer does not), and cuts helicopter false alarms. With RF v1, receiver
+noise drove every rule but AND to 100% false alarms. See `reports/fusion.md`.
 
 ## Splits
 
@@ -196,12 +233,16 @@ src/dronedet/
   models/baseline.py    level-invariant summary features + sklearn models
   models/pretrained.py  frozen PANNs MobileNetV1 encoder (no torchlibrosa)
   eval/metrics.py       threshold at FPR, grouped bootstrap, per-category FA
-  eval/protocol.py      tier 1 / 2 / 3 protocol shared by every model
+  eval/protocol.py      tier 1-4 protocol shared by every model (sample weights, holdout)
+  data/rf_tampere.py    Tampere IQ -> DroneRF's two bands and PSD
+  data/rf_noise.py      synthetic receiver noise (no transmitter), both pipelines
+  models/deep.py        CNN, CNN+GRU, tiny AST; sklearn-style trainer
+  fusion.py             calibration to LLR, capped sum / learned layer, four states
   features/noise.py     noise conditions, SNR mixing, synthetic music
   models/uncertainty.py review band, familiarity, ensemble, the four states
   models/explain.py     Grad-CAM through the frozen encoder + linear head
-  live.py               window-by-window runtime shared by detect.py and the app
-app/dashboard.py              Streamlit monitor (replay, states, Grad-CAM)
+  live.py               window-by-window runtime, RF replay feed, fusion
+app/dashboard.py              Streamlit monitor (replay, states, Grad-CAM, RF + fused)
 scripts/download_data.py
 scripts/prepare_rf.py         DroneRF: download (4 GB, resumable), then PSD features
 scripts/build_manifest.py
@@ -213,6 +254,12 @@ scripts/train_outdoor.py      tier 4
 scripts/train_rf.py           RF detectors
 scripts/eval_noise.py         noise stress test + augmentation ablation
 scripts/eval_uncertainty.py   uncertainty flags, open set, saves data/models/detector.joblib
+scripts/train_deep.py         CNN vs CNN+GRU vs transformer, all tiers
+scripts/eval_identify.py      which-drone confusion matrices
+scripts/eval_rf_uncertainty.py RF v1 flags, saves data/models/rf_detector_dronerf.joblib
+scripts/eval_rf_tampere.py    RF v1 on a new receiver, white-noise control
+scripts/train_rf_v2.py        RF v2 (deployed), saves data/models/rf_detector.joblib
+scripts/eval_fusion.py        fusion ablation, saves data/models/fusion.joblib
 scripts/detect.py             run the detector on any audio file
 scripts/make_figures.py       six presentation figures (spectrograms, results, timelines)
 reports/baseline_audio.{md,json}
@@ -221,6 +268,7 @@ reports/outdoor_audio.{md,json}
 reports/noise_robustness.{md,json}
 reports/uncertainty_audio.{md,json}
 reports/rf_detection.{md,json}
+reports/deep_audio.{md,json}, identify, rf_uncertainty, rf_tampere, rf_v2, fusion
 tests/test_manifest.py        13 tests, incl. an injected-leak check
 tests/test_audio_features.py  12 tests, incl. cache-reproduces-from-code
 tests/test_baseline.py        5 tests, incl. level invariance
@@ -228,6 +276,9 @@ tests/test_pretrained.py      6 tests, incl. level invariance of embeddings
 tests/test_rf.py              14 tests, incl. an injected-leak check
 tests/test_noise.py           10 tests, incl. exact SNR
 tests/test_uncertainty.py     8 tests, incl. Grad-CAM logit = head logit
+tests/test_rf_tampere.py      3 tests, incl. a tone lands in the right band and bin
+tests/test_fusion_deep.py     9 tests, incl. per-sensor-set false-alarm rate, level invariance
+tests/test_rf_v2.py           8 tests, incl. noise has no carrier, tilt ignores common gain
 data/                   gitignored — raw corpora, checkpoint, manifest, caches
 ```
 

@@ -5,7 +5,7 @@ Classification* project: what every part does, how it works, why it was built
 that way, what happens to the data at each step, and where every output lands.
 
 RF is handled separately by the other teammate; this document covers audio
-only. Status as of 27 Oct 2026.
+only. Status as of 27 Oct 2026; section 12 is updated to Nov 2026.
 
 ---
 
@@ -818,8 +818,8 @@ level-invariant, and why the encoder input is RMS-normalised.
 | `data/features_legacy/` | an old uncommitted script | Unused; safe to delete (360 MB) |
 
 `data/` is gitignored throughout; everything there can be rebuilt from the
-scripts. `reports/*.md` and `*.json` are tracked in git (the
-`pretrained_audio.*` files are new and not committed yet).
+scripts. `reports/*.md` and `*.json` are tracked in git; `reports/figures/*.png`
+are not (rebuild them with the scripts).
 
 ---
 
@@ -880,9 +880,9 @@ silently broken.
   the drone type per file, so outdoor results can't be broken down by drone.
 - **1 s windows**, while the proposal mentions 2–4 s. The indoor corpus is
   published in 1 s slices.
-- **No noise-robustness testing yet** (voice, traffic, wind, music masking).
-- **No calibration, uncertainty, or "unknown drone" output yet.** The score
-  is not yet a calibrated probability.
+- **Noise mixing is additive** at a fixed SNR: no reverberation or distance.
+- **The audio score is not a calibrated probability** (no temperature
+  scaling); fusion calibrates it to a likelihood ratio on validation data.
 - **Small outdoor test set** (30 recordings per class), hence the wide CIs
   on tier 3.
 
@@ -898,15 +898,19 @@ silently broken.
 | Cross-dataset generalisation (outdoor) | ✅ Measured; this is the main weakness |
 | Temporal smoothing (stretch goal) | ✅ Basic: 2 consecutive hits |
 | Runnable demo | ✅ `scripts/detect.py` |
-| CNN vs CNN+LSTM vs transformer comparison | ⚠️ Partial: baseline vs pretrained CNN only |
-| Noise robustness (voice / traffic / wind / music / mixed × low / med / high) | ✅ `reports/noise_robustness.md` |
+| CNN vs CNN+LSTM vs transformer comparison | ✅ CNN, CNN+GRU, tiny AST from scratch, all four tiers: `reports/deep_audio.md` |
+| Noise robustness (voice / traffic / wind / music / mixed × low / med / high) | ✅ `reports/noise_robustness.md`, plus real speech (LibriSpeech) and real music (GTZAN) |
 | Augmentation ablation | ✅ Noise-augmented head vs clean head (head only; encoder frozen) |
-| Drone-model classification + per-class confusion matrices | ⚠️ RF only (`reports/rf_detection.md`) |
+| Drone-model classification + per-class confusion matrices | ✅ Audio and RF: `reports/identify.md` |
+| Accuracy / F1 | ✅ Reported beside PR-AUC and recall at 1% FPR (all reports); headline metrics unchanged |
+| RF uncertainty + "unknown signature" | ✅ `reports/rf_uncertainty.md` (inherits the RF caveat) |
+| RF cross-dataset test | ✅ Tampere recordings: RF v1 calls pure noise "drone", `reports/rf_tampere.md` |
+| RF detector that detects transmissions | ✅ RF v2, `reports/rf_v2.md`: noise "no drone", 9/10 unseen Tampere drones caught; real-world Wi-Fi / Bluetooth false alarms unmeasured |
 | Uncertainty flag ("low confidence") | ✅ Review band + familiarity, `reports/uncertainty_audio.md` |
 | Probability calibration (temperature scaling, ECE) | ❌ Not done; the flags use ranks, not calibrated probabilities |
 | Open-set "Unknown drone" | ✅ Train Bebop, Mambo flagged at AUROC 0.81 |
 | Streamlit dashboard + explainability overlay | ✅ `app/dashboard.py`, Grad-CAM |
-| Fusion with RF + ablation | ❌ Waits for a second RF corpus |
+| Fusion with RF + ablation | ✅ Calibrated sum + learned layer on RF v2, `reports/fusion.md` |
 
 **What was added after this guide was first written (Nov 2026):**
 
@@ -921,14 +925,19 @@ silently broken.
 - `app/dashboard.py`: replays a recording as a live feed; Grad-CAM through
   the frozen encoder (`src/dronedet/models/explain.py`).
 
+**Added in Nov 2026, second round** (details in `PROJECT_SUMMARY.md`):
+`models/deep.py` + `scripts/train_deep.py` (the proposal's model comparison),
+`scripts/eval_identify.py`, `scripts/eval_rf_uncertainty.py`,
+`data/rf_tampere.py` + `scripts/eval_rf_tampere.py`, `data/rf_noise.py` +
+`scripts/train_rf_v2.py` (RF v2), `fusion.py` +
+`scripts/eval_fusion.py`, real speech / music conditions in
+`features/noise.py`, and an RF feed + fused state in the dashboard.
+
 **Next steps, in order:**
 
-1. **Second RF corpus** (DroneDetect or CardRF, IEEE DataPort login), and a
-   repeat of the quiet-window check. Nothing RF-side is trustworthy before it.
+1. **Real Wi-Fi / Bluetooth negatives from outside DroneRF's lab**, to
+   measure RF v2's real-world false alarms (Kaggle "Noisy Drone RF" needs an
+   API token; DroneDetect a DataPort subscription; CardRF an institution
+   login). Add them in `scripts/train_rf_v2.py`; fusion reruns unchanged.
 2. **Outdoor helicopter / aircraft negatives** for audio training.
-3. **Fusion.** Agree on a per-window output such as
-   `{p_drone, state, uncertainty}` in `contracts.py`. The audio and RF
-   datasets were not recorded together, so fusion has to be trained on
-   synthetic pairs matched by class.
-4. **Audio drone-model confusion matrix** (Bebop vs Mambo) if the report
-   needs one; only two indoor models exist.
+3. **Probability calibration** (ECE) for the audio head.

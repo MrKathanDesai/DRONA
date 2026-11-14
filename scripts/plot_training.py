@@ -33,7 +33,7 @@ from torch import nn
 from dronedet.eval import protocol as P
 from dronedet.models import rf as M
 from dronedet.paths import DATA_DIR
-from make_figures import BLUE, GRID, INK2, ORANGE, REPORTS, save
+from make_figures import BLUE, ORANGE, REPORTS, save
 from train_pretrained import HEADS
 
 FRACTIONS = (0.1, 0.25, 0.5, 0.75, 1.0)

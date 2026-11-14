@@ -35,18 +35,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 
 from dronedet.eval import metrics as E
 from dronedet.eval import protocol as P
 from dronedet.models import pretrained as PT
 from dronedet.models import uncertainty as U
 from dronedet.paths import DATA_DIR
-from train_outdoor import source_weights
+
 
 TARGET_FPR = 0.01
 REVIEW_RATE = 0.10
@@ -61,12 +58,11 @@ INK, INK2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 
 
 def head_balanced():
-    return make_pipeline(StandardScaler(),
-                         LogisticRegression(C=0.01, class_weight="balanced", max_iter=5000))
+    return PT.head(balanced=True)
 
 
 def head_weighted():          # tier 4: weights come from source_weights instead
-    return make_pipeline(StandardScaler(), LogisticRegression(C=0.01, max_iter=5000))
+    return PT.head(balanced=False)
 
 
 def build(F, df, tr, va, make_head, weights=None) -> U.Detector:
@@ -183,7 +179,7 @@ def main() -> int:
     for name, (tier, make, weighted) in setups.items():
         print(f"  {name} ...", flush=True)
         tr, va, te = ((df[tier] == s).values for s in ("train", "val", "test"))
-        w = source_weights(df[tr]) if weighted else None
+        w = P.source_weights(df[tr]) if weighted else None
         det = build(F, df, tr, va, make, w)
         res, states, curves[name] = evaluate(det, F, df, te)
         res["threshold"], res["margin_logit"] = det.threshold, det.margin

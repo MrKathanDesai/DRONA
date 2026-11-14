@@ -23,13 +23,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 
-from dronedet.eval import metrics as E
 from dronedet.eval import protocol as P
 from dronedet.models import baseline as B
+from dronedet.models import pretrained as PT
 from dronedet.paths import DATA_DIR
 from train_pretrained import TARGET_FPR, fmt, md_table, recording_level
 
@@ -38,31 +35,20 @@ HEAD_OUT = DATA_DIR / "models" / "outdoor_head.joblib"
 TIER = "split_tier4"
 
 
-def source_weights(df: pd.DataFrame) -> np.ndarray:
-    """Every (source, label) cell gets equal total weight."""
-    n = df.groupby(["source", "label"]).label.transform("size").values
-    w = 1.0 / n
-    return w * len(df) / w.sum()
-
-
 def make_head() -> object:
-    return make_pipeline(StandardScaler(),
-                         LogisticRegression(C=0.01, max_iter=5000))
+    return PT.head(balanced=False)
+
+
+def _class_balanced(t: pd.DataFrame) -> np.ndarray:
+    """class_weight="balanced", as in tier 3, as explicit sample weights."""
+    p = t.y.mean()
+    return np.where(t.y == 1, 0.5 / p, 0.5 / (1 - p))
 
 
 def fit_eval(F, df, balanced: bool):
-    tr, va, te = (df[TIER] == s for s in ("train", "val", "test"))
-    if balanced:
-        w = source_weights(df[tr])
-    else:                             # class_weight="balanced", as in tier 3
-        w = np.where(df.y[tr] == 1, 0.5 / df.y[tr].mean(), 0.5 / (1 - df.y[tr].mean()))
-    model = make_head().fit(F[tr], df.y[tr], logisticregression__sample_weight=w)
-    s_va = model.predict_proba(F[va])[:, 1]
-    s_te = model.predict_proba(F[te])[:, 1]
-    thr = E.threshold_at_fpr(s_va[df.y[va].values == 0], TARGET_FPR)
-    res = E.summarize(df.y[te], s_te, df.group_id[te], thr)
-    res["val_recall"] = E.operating_point(df.y[va].values, s_va, thr)["recall"]
-    return res, E.false_alarms_by_category(df[te], s_te, thr), model, thr
+    return P.tier4(F, df, make_head, TARGET_FPR,
+                   weights=P.source_weights if balanced else _class_balanced,
+                   weight_param="logisticregression__sample_weight")
 
 
 def drone_vs_helicopter(df, scores) -> float:

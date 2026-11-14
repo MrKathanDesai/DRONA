@@ -1,0 +1,849 @@
+{
+  "target_fpr": 0.01,
+  "llr_cap": 5.0,
+  "pairs_per_class": 4000,
+  "deploy": "sum",
+  "learned_weights_audio_rf": [
+    1.0078376887319331,
+    1.6016334711740903
+  ],
+  "learned_bias": 0.34930826848346147,
+  "scenarios": {
+    "both sensors": {
+      "audio only": {
+        "pr_auc": 0.7590377533838065,
+        "pr_auc_ci95": [
+          0.6398183128385281,
+          0.8468348668257092
+        ],
+        "roc_auc": 0.7183461874999999,
+        "prevalence": 0.5,
+        "threshold": 3.056633939102497,
+        "recall": 0.22525,
+        "fpr": 0.00675,
+        "false_alarms": 27,
+        "negatives": 4000,
+        "accuracy": 0.60925,
+        "precision": 0.9709051724137931,
+        "f1": 0.36566558441558444,
+        "confusion": [
+          [
+            3973,
+            27
+          ],
+          [
+            3099,
+            901
+          ]
+        ]
+      },
+      "RF only": {
+        "pr_auc": 1.0,
+        "pr_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "roc_auc": 1.0,
+        "prevalence": 0.5,
+        "threshold": -0.14454603503031782,
+        "recall": 0.99275,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.996375,
+        "precision": 1.0,
+        "f1": 0.9963618115669302,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            29,
+            3971
+          ]
+        ]
+      },
+      "OR": {
+        "threshold": 0.5,
+        "recall": 0.9945,
+        "fpr": 0.00675,
+        "false_alarms": 27,
+        "negatives": 4000,
+        "accuracy": 0.993875,
+        "precision": 0.9932584269662922,
+        "f1": 0.9938788257339163,
+        "confusion": [
+          [
+            3973,
+            27
+          ],
+          [
+            22,
+            3978
+          ]
+        ],
+        "pr_auc": null,
+        "pr_auc_ci95": [
+          null,
+          null
+        ],
+        "roc_auc": null
+      },
+      "AND": {
+        "threshold": 0.5,
+        "recall": 0.2235,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.61175,
+        "precision": 1.0,
+        "f1": 0.3653453208009808,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            3106,
+            894
+          ]
+        ],
+        "pr_auc": null,
+        "pr_auc_ci95": [
+          null,
+          null
+        ],
+        "roc_auc": null
+      },
+      "sum": {
+        "pr_auc": 0.9993688460599383,
+        "pr_auc_ci95": [
+          0.9988652107253624,
+          0.9997246572198949
+        ],
+        "roc_auc": 0.9991765625,
+        "prevalence": 0.5,
+        "threshold": -1.5529096573365986,
+        "recall": 0.99475,
+        "fpr": 0.00525,
+        "false_alarms": 21,
+        "negatives": 4000,
+        "accuracy": 0.99475,
+        "precision": 0.99475,
+        "f1": 0.99475,
+        "confusion": [
+          [
+            3979,
+            21
+          ],
+          [
+            21,
+            3979
+          ]
+        ]
+      },
+      "learned": {
+        "pr_auc": 0.9996759853343502,
+        "pr_auc_ci95": [
+          0.999353980266228,
+          0.999887794905955
+        ],
+        "roc_auc": 0.9995844375,
+        "prevalence": 0.5,
+        "threshold": -2.254254998849956,
+        "recall": 0.99575,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.997875,
+        "precision": 1.0,
+        "f1": 0.9978704747588626,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            17,
+            3983
+          ]
+        ]
+      }
+    },
+    "RF-silent drone (autonomous)": {
+      "audio only": {
+        "pr_auc": 0.7555836146081751,
+        "pr_auc_ci95": [
+          0.6349563334451597,
+          0.8461604553310875
+        ],
+        "roc_auc": 0.7209925625,
+        "prevalence": 0.5,
+        "threshold": 3.056633939102497,
+        "recall": 0.22325,
+        "fpr": 0.01175,
+        "false_alarms": 47,
+        "negatives": 4000,
+        "accuracy": 0.60575,
+        "precision": 0.95,
+        "f1": 0.36153846153846153,
+        "confusion": [
+          [
+            3953,
+            47
+          ],
+          [
+            3107,
+            893
+          ]
+        ]
+      },
+      "RF only": {
+        "pr_auc": 0.500737582781457,
+        "pr_auc_ci95": [
+          0.38520159279860183,
+          0.605965113905242
+        ],
+        "roc_auc": 0.501375,
+        "prevalence": 0.5,
+        "threshold": -0.14454603503031782,
+        "recall": 0.0,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.5,
+        "precision": NaN,
+        "f1": 0.0,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            4000,
+            0
+          ]
+        ]
+      },
+      "OR": {
+        "threshold": 0.5,
+        "recall": 0.22325,
+        "fpr": 0.01175,
+        "false_alarms": 47,
+        "negatives": 4000,
+        "accuracy": 0.60575,
+        "precision": 0.95,
+        "f1": 0.36153846153846153,
+        "confusion": [
+          [
+            3953,
+            47
+          ],
+          [
+            3107,
+            893
+          ]
+        ],
+        "pr_auc": null,
+        "pr_auc_ci95": [
+          null,
+          null
+        ],
+        "roc_auc": null
+      },
+      "AND": {
+        "threshold": 0.5,
+        "recall": 0.0,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.5,
+        "precision": NaN,
+        "f1": 0.0,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            4000,
+            0
+          ]
+        ],
+        "pr_auc": null,
+        "pr_auc_ci95": [
+          null,
+          null
+        ],
+        "roc_auc": null
+      },
+      "sum": {
+        "pr_auc": 0.7555288792702967,
+        "pr_auc_ci95": [
+          0.6348273870573213,
+          0.8459080376424603
+        ],
+        "roc_auc": 0.7210533125,
+        "prevalence": 0.5,
+        "threshold": -1.5529096573365986,
+        "recall": 0.18425,
+        "fpr": 0.0085,
+        "false_alarms": 34,
+        "negatives": 4000,
+        "accuracy": 0.587875,
+        "precision": 0.9559014267185474,
+        "f1": 0.3089499056801509,
+        "confusion": [
+          [
+            3966,
+            34
+          ],
+          [
+            3263,
+            737
+          ]
+        ]
+      },
+      "learned": {
+        "pr_auc": 0.7553960435426983,
+        "pr_auc_ci95": [
+          0.6346242931932528,
+          0.8457349257341018
+        ],
+        "roc_auc": 0.7210611249999999,
+        "prevalence": 0.5,
+        "threshold": -2.254254998849956,
+        "recall": 0.00175,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.500875,
+        "precision": 1.0,
+        "f1": 0.003493885700024957,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            3993,
+            7
+          ]
+        ]
+      }
+    },
+    "audio unavailable": {
+      "RF only": {
+        "pr_auc": 1.0,
+        "pr_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "roc_auc": 1.0,
+        "prevalence": 0.5,
+        "threshold": -0.14454603503031782,
+        "recall": 0.9925,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.99625,
+        "precision": 1.0,
+        "f1": 0.9962358845671266,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            30,
+            3970
+          ]
+        ]
+      },
+      "sum": {
+        "pr_auc": 1.0,
+        "pr_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "roc_auc": 1.0,
+        "prevalence": 0.5,
+        "threshold": -0.13988865671049974,
+        "recall": 0.9925,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.99625,
+        "precision": 1.0,
+        "f1": 0.9962358845671266,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            30,
+            3970
+          ]
+        ]
+      },
+      "learned": {
+        "pr_auc": 1.0,
+        "pr_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "roc_auc": 1.0,
+        "prevalence": 0.5,
+        "threshold": 0.12525791365834305,
+        "recall": 0.9925,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.99625,
+        "precision": 1.0,
+        "f1": 0.9962358845671266,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            30,
+            3970
+          ]
+        ]
+      }
+    },
+    "RF unavailable": {
+      "audio only": {
+        "pr_auc": 0.750691225728135,
+        "pr_auc_ci95": [
+          0.6233208823333554,
+          0.8417870214159264
+        ],
+        "roc_auc": 0.7119058125,
+        "prevalence": 0.5,
+        "threshold": 3.056633939102497,
+        "recall": 0.2175,
+        "fpr": 0.00925,
+        "false_alarms": 37,
+        "negatives": 4000,
+        "accuracy": 0.604125,
+        "precision": 0.9592061742006616,
+        "f1": 0.3545954758508254,
+        "confusion": [
+          [
+            3963,
+            37
+          ],
+          [
+            3130,
+            870
+          ]
+        ]
+      },
+      "sum": {
+        "pr_auc": 0.750691225728135,
+        "pr_auc_ci95": [
+          0.6233208823333554,
+          0.8417870214159264
+        ],
+        "roc_auc": 0.7119058125,
+        "prevalence": 0.5,
+        "threshold": 2.7585239018943506,
+        "recall": 0.263,
+        "fpr": 0.0245,
+        "false_alarms": 98,
+        "negatives": 4000,
+        "accuracy": 0.61925,
+        "precision": 0.9147826086956522,
+        "f1": 0.40854368932038837,
+        "confusion": [
+          [
+            3902,
+            98
+          ],
+          [
+            2948,
+            1052
+          ]
+        ]
+      },
+      "learned": {
+        "pr_auc": 0.750691225728135,
+        "pr_auc_ci95": [
+          0.6233208823333554,
+          0.8417870214159264
+        ],
+        "roc_auc": 0.7119058125,
+        "prevalence": 0.5,
+        "threshold": 3.1294526220804575,
+        "recall": 0.263,
+        "fpr": 0.0245,
+        "false_alarms": 98,
+        "negatives": 4000,
+        "accuracy": 0.61925,
+        "precision": 0.9147826086956522,
+        "f1": 0.40854368932038837,
+        "confusion": [
+          [
+            3902,
+            98
+          ],
+          [
+            2948,
+            1052
+          ]
+        ]
+      }
+    },
+    "RF on new receiver (Tampere drones)": {
+      "audio only": {
+        "pr_auc": 0.7502738917167682,
+        "pr_auc_ci95": [
+          0.6295445056601603,
+          0.8438926797865814
+        ],
+        "roc_auc": 0.7132485,
+        "prevalence": 0.5,
+        "threshold": 3.056633939102497,
+        "recall": 0.22075,
+        "fpr": 0.01025,
+        "false_alarms": 41,
+        "negatives": 4000,
+        "accuracy": 0.60525,
+        "precision": 0.9556277056277056,
+        "f1": 0.3586515028432169,
+        "confusion": [
+          [
+            3959,
+            41
+          ],
+          [
+            3117,
+            883
+          ]
+        ]
+      },
+      "RF only": {
+        "pr_auc": 1.0,
+        "pr_auc_ci95": [
+          1.0,
+          1.0
+        ],
+        "roc_auc": 1.0,
+        "prevalence": 0.5,
+        "threshold": -0.14454603503031782,
+        "recall": 1.0,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "f1": 1.0,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            0,
+            4000
+          ]
+        ]
+      },
+      "OR": {
+        "threshold": 0.5,
+        "recall": 1.0,
+        "fpr": 0.01025,
+        "false_alarms": 41,
+        "negatives": 4000,
+        "accuracy": 0.994875,
+        "precision": 0.989853996535511,
+        "f1": 0.9949011317000372,
+        "confusion": [
+          [
+            3959,
+            41
+          ],
+          [
+            0,
+            4000
+          ]
+        ],
+        "pr_auc": null,
+        "pr_auc_ci95": [
+          null,
+          null
+        ],
+        "roc_auc": null
+      },
+      "AND": {
+        "threshold": 0.5,
+        "recall": 0.22075,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.610375,
+        "precision": 1.0,
+        "f1": 0.3616629121441737,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            3117,
+            883
+          ]
+        ],
+        "pr_auc": null,
+        "pr_auc_ci95": [
+          null,
+          null
+        ],
+        "roc_auc": null
+      },
+      "sum": {
+        "pr_auc": 1.0,
+        "pr_auc_ci95": [
+          0.9999999999999999,
+          1.0
+        ],
+        "roc_auc": 1.0,
+        "prevalence": 0.5,
+        "threshold": -1.5529096573365986,
+        "recall": 1.0,
+        "fpr": 0.0075,
+        "false_alarms": 30,
+        "negatives": 4000,
+        "accuracy": 0.99625,
+        "precision": 0.9925558312655087,
+        "f1": 0.9962640099626401,
+        "confusion": [
+          [
+            3970,
+            30
+          ],
+          [
+            0,
+            4000
+          ]
+        ]
+      },
+      "learned": {
+        "pr_auc": 1.0,
+        "pr_auc_ci95": [
+          0.9999999999999999,
+          1.0
+        ],
+        "roc_auc": 1.0,
+        "prevalence": 0.5,
+        "threshold": -2.254254998849956,
+        "recall": 1.0,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "f1": 1.0,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            0,
+            4000
+          ]
+        ]
+      }
+    },
+    "RF noise only (receiver noise, no drone)": {
+      "audio only": {
+        "pr_auc": 0.7529033983102101,
+        "pr_auc_ci95": [
+          0.635750633990181,
+          0.845807482500241
+        ],
+        "roc_auc": 0.7113566874999999,
+        "prevalence": 0.5,
+        "threshold": 3.056633939102497,
+        "recall": 0.22425,
+        "fpr": 0.01,
+        "false_alarms": 40,
+        "negatives": 4000,
+        "accuracy": 0.607125,
+        "precision": 0.9573105656350054,
+        "f1": 0.36337856998177026,
+        "confusion": [
+          [
+            3960,
+            40
+          ],
+          [
+            3103,
+            897
+          ]
+        ]
+      },
+      "RF only": {
+        "pr_auc": 0.999582287032129,
+        "pr_auc_ci95": [
+          0.9992674688211228,
+          0.9997654672032463
+        ],
+        "roc_auc": 0.999568625,
+        "prevalence": 0.5,
+        "threshold": -0.14454603503031782,
+        "recall": 0.99275,
+        "fpr": 0.01275,
+        "false_alarms": 51,
+        "negatives": 4000,
+        "accuracy": 0.99,
+        "precision": 0.987319741422178,
+        "f1": 0.9900274245823985,
+        "confusion": [
+          [
+            3949,
+            51
+          ],
+          [
+            29,
+            3971
+          ]
+        ]
+      },
+      "OR": {
+        "threshold": 0.5,
+        "recall": 0.99275,
+        "fpr": 0.02275,
+        "false_alarms": 91,
+        "negatives": 4000,
+        "accuracy": 0.985,
+        "precision": 0.9775972427375677,
+        "f1": 0.9851153559910693,
+        "confusion": [
+          [
+            3909,
+            91
+          ],
+          [
+            29,
+            3971
+          ]
+        ],
+        "pr_auc": null,
+        "pr_auc_ci95": [
+          null,
+          null
+        ],
+        "roc_auc": null
+      },
+      "AND": {
+        "threshold": 0.5,
+        "recall": 0.22425,
+        "fpr": 0.0,
+        "false_alarms": 0,
+        "negatives": 4000,
+        "accuracy": 0.612125,
+        "precision": 1.0,
+        "f1": 0.36634674290381863,
+        "confusion": [
+          [
+            4000,
+            0
+          ],
+          [
+            3103,
+            897
+          ]
+        ],
+        "pr_auc": null,
+        "pr_auc_ci95": [
+          null,
+          null
+        ],
+        "roc_auc": null
+      },
+      "sum": {
+        "pr_auc": 0.9975814632505838,
+        "pr_auc_ci95": [
+          0.9958070031972088,
+          0.9987094538027297
+        ],
+        "roc_auc": 0.9974911249999999,
+        "prevalence": 0.5,
+        "threshold": -1.5529096573365986,
+        "recall": 0.99225,
+        "fpr": 0.02775,
+        "false_alarms": 111,
+        "negatives": 4000,
+        "accuracy": 0.98225,
+        "precision": 0.9727941176470588,
+        "f1": 0.9824257425742574,
+        "confusion": [
+          [
+            3889,
+            111
+          ],
+          [
+            31,
+            3969
+          ]
+        ]
+      },
+      "learned": {
+        "pr_auc": 0.9989450114216883,
+        "pr_auc_ci95": [
+          0.998118592851416,
+          0.9994509278116153
+        ],
+        "roc_auc": 0.9988941874999999,
+        "prevalence": 0.5,
+        "threshold": -2.254254998849956,
+        "recall": 0.9945,
+        "fpr": 0.0215,
+        "false_alarms": 86,
+        "negatives": 4000,
+        "accuracy": 0.9865,
+        "precision": 0.9788385826771654,
+        "f1": 0.9866071428571429,
+        "confusion": [
+          [
+            3914,
+            86
+          ],
+          [
+            22,
+            3978
+          ]
+        ]
+      }
+    }
+  },
+  "helicopter_false_alarm_rate": {
+    "audio only": 0.013874614594039054,
+    "RF only": 0.0,
+    "OR": 0.013874614594039054,
+    "AND": 0.0,
+    "sum": 0.01079136690647482,
+    "learned": 0.0
+  },
+  "states_both_sensors": {
+    "drone": {
+      "drone": 0.791,
+      "low confidence": 0.147,
+      "no drone": 0.0,
+      "unknown drone": 0.062
+    },
+    "no drone": {
+      "drone": 0.0,
+      "low confidence": 0.417,
+      "no drone": 0.583,
+      "unknown drone": 0.0
+    }
+  }
+}

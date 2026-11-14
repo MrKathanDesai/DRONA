@@ -3,6 +3,8 @@
 
     python scripts/download_data.py            # fetch anything missing
     python scripts/download_data.py --verify   # check only, download nothing
+    python scripts/download_data.py --extra    # also speech/music noise (1.6 GB)
+                                               # and Tampere RF (5.3 GB)
 
 Safe to re-run: it skips anything already present and intact. Nothing here is
 committed to git (data/ is gitignored), so this script IS the record of where
@@ -14,7 +16,6 @@ import argparse
 import hashlib
 import shutil
 import subprocess
-import sys
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -214,10 +215,104 @@ def get_aris(verify_only=False):
     return good
 
 
+def _curl_resume(url: str, path: Path, size: int, tries: int = 60) -> bool:
+    """Resume until the file reaches `size` bytes; these hosts drop connections."""
+    for _ in range(tries):
+        if path.exists() and path.stat().st_size == size:
+            return True
+        subprocess.run(["curl", "-sSL", "-C", "-", "-m", "600", "-o", str(path), url],
+                       check=False)
+    return path.exists() and path.stat().st_size == size
+
+
+# --- 6. real speech and music for the noise test ------------------------------
+NOISE = {   # name: (url, bytes, sha256, folder it unpacks to)
+    "LibriSpeech dev-clean (CC BY 4.0)": (
+        "https://www.openslr.org/resources/12/dev-clean.tar.gz", 337926286,
+        None, "LibriSpeech/dev-clean"),
+    "GTZAN genres (research use)": (
+        "https://huggingface.co/datasets/marsyas/gtzan/resolve/main/data/genres.tar.gz",
+        1226192050, None, "genres"),
+}
+
+
+def get_noise(verify_only=False):
+    step("6. Speech and music noise  (LibriSpeech dev-clean, GTZAN)")
+    dest = DATA / "raw_noise"
+    good = True
+    for name, (url, size, sha, folder) in NOISE.items():
+        if not (dest / folder).exists():
+            if verify_only:
+                warn(f"{name}: missing")
+                good = False
+                continue
+            dest.mkdir(parents=True, exist_ok=True)
+            arc = dest / url.rsplit("/", 1)[-1]
+            print(f"  downloading {name}, {size / 1e6:.0f} MB, resuming on drops ...")
+            if not _curl_resume(url, arc, size):
+                warn(f"{name}: incomplete; re-run to resume")
+                good = False
+                continue
+            if sha and hashlib.sha256(arc.read_bytes()).hexdigest() != sha:
+                warn(f"{name}: checksum mismatch")
+                good = False
+                continue
+            subprocess.run(["tar", "-xzf", str(arc), "-C", str(dest)], check=True)
+            arc.unlink()
+        n = sum(1 for _ in (dest / folder).rglob("*")
+                if _.suffix in (".flac", ".au", ".wav"))
+        ok(f"{name}: {n} files")
+    print("     Test-only noise conditions 'speech' and 'music_real' in")
+    print("     scripts/eval_noise.py; split by speaker / excerpt.")
+    return good
+
+
+# --- 7. Tampere drone RF recordings (cross-receiver RF test) -----------------
+TAMPERE_API = "https://zenodo.org/api/records/4264467"
+
+
+def get_tampere(verify_only=False):
+    step("7. Tampere drone RF recordings  (Zenodo 4264467, CC BY 4.0)")
+    import json
+    dest = DATA / "raw_tampere"
+    files = [f for f in json.load(urllib.request.urlopen(TAMPERE_API, timeout=90))["files"]
+             if f["key"].endswith(".bin") and "_2G" in f["key"]]
+    good = True
+    for f in files:
+        path, size = dest / f["key"], f["size"]
+        if not (path.exists() and path.stat().st_size == size):
+            if verify_only:
+                warn(f"{f['key']}: missing or partial")
+                good = False
+                continue
+            dest.mkdir(parents=True, exist_ok=True)
+            url = f"https://zenodo.org/records/4264467/files/{f['key']}?download=1"
+            if not _curl_resume(url, path, size):
+                warn(f"{f['key']}: incomplete; re-run to resume")
+                good = False
+                continue
+        algo, val = f["checksum"].split(":")
+        h = hashlib.new(algo)
+        with open(path, "rb") as fh:
+            for b in iter(lambda: fh.read(1 << 24), b""):
+                h.update(b)
+        if h.hexdigest() != val:
+            warn(f"{f['key']}: checksum mismatch, deleting")
+            path.unlink()
+            good = False
+    if good:
+        ok(f"{len(files)} recordings at 2.44 GHz, checksums match")
+    print("     Used by scripts/eval_rf_tampere.py; no drone-off recordings.")
+    return good
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--verify", action="store_true",
                     help="check what is present, download nothing")
+    ap.add_argument("--extra", action="store_true",
+                    help="also speech/music noise and the Tampere RF recordings")
+    ap.add_argument("--only-extra", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     DATA.mkdir(parents=True, exist_ok=True)
@@ -225,11 +320,12 @@ def main() -> int:
     print("  DATASETS" + ("  (verify only)" if args.verify else ""))
     print("=" * 66)
 
-    results = [get_droneaudio(args.verify),
-               get_esc50(args.verify),
-               get_svanstrom(args.verify),
-               get_pretrained(args.verify),
-               get_aris(args.verify)]
+    results = [] if args.only_extra else [
+        get_droneaudio(args.verify), get_esc50(args.verify),
+        get_svanstrom(args.verify), get_pretrained(args.verify),
+        get_aris(args.verify)]
+    if args.extra or args.only_extra:
+        results += [get_noise(args.verify), get_tampere(args.verify)]
 
     print("\n" + "=" * 66)
     if all(results):

@@ -19,6 +19,19 @@
         "fpr": 0.0,
         "false_alarms": 0,
         "negatives": 50,
+        "accuracy": 0.9875,
+        "precision": 1.0,
+        "f1": 0.9925373134328358,
+        "confusion": [
+          [
+            50,
+            0
+          ],
+          [
+            4,
+            266
+          ]
+        ],
         "val_recall": 0.9814814814814815
       },
       "tier2_bebop": {
@@ -33,7 +46,20 @@
         "recall": 0.9773809523809524,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9793478260869565,
+        "precision": 1.0,
+        "f1": 0.9885611077664057,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            19,
+            821
+          ]
+        ]
       },
       "tier2_ar": {
         "pr_auc": 1.0,
@@ -47,7 +73,20 @@
         "recall": 0.9938271604938271,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9943820224719101,
+        "precision": 1.0,
+        "f1": 0.9969040247678018,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            5,
+            805
+          ]
+        ]
       },
       "tier2_phantom": {
         "pr_auc": 0.5801864887926946,
@@ -61,7 +100,20 @@
         "recall": 0.0761904761904762,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.3310344827586207,
+        "precision": 1.0,
+        "f1": 0.14159292035398233,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            194,
+            16
+          ]
+        ]
       }
     },
     "forest": {
@@ -73,11 +125,24 @@
         ],
         "roc_auc": 1.0,
         "prevalence": 0.84375,
-        "threshold": 0.2616944444444446,
+        "threshold": 0.26169444444444456,
         "recall": 1.0,
         "fpr": 0.02,
         "false_alarms": 1,
         "negatives": 50,
+        "accuracy": 0.996875,
+        "precision": 0.996309963099631,
+        "f1": 0.9981515711645101,
+        "confusion": [
+          [
+            49,
+            1
+          ],
+          [
+            0,
+            270
+          ]
+        ],
         "val_recall": 1.0
       },
       "tier2_bebop": {
@@ -88,11 +153,24 @@
         ],
         "roc_auc": 0.9999553571428571,
         "prevalence": 0.9130434782608695,
-        "threshold": 0.5575039682539683,
+        "threshold": 0.5575039682539684,
         "recall": 0.9880952380952381,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9891304347826086,
+        "precision": 1.0,
+        "f1": 0.9940119760479043,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            10,
+            830
+          ]
+        ]
       },
       "tier2_ar": {
         "pr_auc": 0.9999954350344588,
@@ -102,11 +180,24 @@
         ],
         "roc_auc": 0.9999537037037037,
         "prevalence": 0.9101123595505618,
-        "threshold": 0.4565000000000003,
+        "threshold": 0.4565000000000002,
         "recall": 0.991358024691358,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9921348314606742,
+        "precision": 1.0,
+        "f1": 0.9956602603843769,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            7,
+            803
+          ]
+        ]
       },
       "tier2_phantom": {
         "pr_auc": 0.9999774317309862,
@@ -116,11 +207,24 @@
         ],
         "roc_auc": 0.9999404761904762,
         "prevalence": 0.7241379310344828,
-        "threshold": 0.5062341269841272,
+        "threshold": 0.5062341269841273,
         "recall": 0.9761904761904762,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9827586206896551,
+        "precision": 1.0,
+        "f1": 0.9879518072289156,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            5,
+            205
+          ]
+        ]
       }
     },
     "cnn": {
@@ -137,6 +241,19 @@
         "fpr": 0.0,
         "false_alarms": 0,
         "negatives": 50,
+        "accuracy": 0.98125,
+        "precision": 1.0,
+        "f1": 0.9887640449438202,
+        "confusion": [
+          [
+            50,
+            0
+          ],
+          [
+            6,
+            264
+          ]
+        ],
         "val_recall": 0.9925925925925926
       },
       "tier2_bebop": {
@@ -151,7 +268,20 @@
         "recall": 0.9261904761904762,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9326086956521739,
+        "precision": 1.0,
+        "f1": 0.96168108776267,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            62,
+            778
+          ]
+        ]
       },
       "tier2_ar": {
         "pr_auc": 0.999989355196888,
@@ -165,7 +295,20 @@
         "recall": 0.9666666666666667,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9696629213483146,
+        "precision": 1.0,
+        "f1": 0.983050847457627,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            27,
+            783
+          ]
+        ]
       },
       "tier2_phantom": {
         "pr_auc": 0.9999547559940247,
@@ -179,7 +322,20 @@
         "recall": 0.9904761904761905,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.993103448275862,
+        "precision": 1.0,
+        "f1": 0.9952153110047847,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            2,
+            208
+          ]
+        ]
       }
     },
     "forest+level": {
@@ -191,11 +347,24 @@
         ],
         "roc_auc": 1.0,
         "prevalence": 0.84375,
-        "threshold": 0.28925396825396826,
+        "threshold": 0.2892539682539682,
         "recall": 1.0,
         "fpr": 0.0,
         "false_alarms": 0,
         "negatives": 50,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "f1": 1.0,
+        "confusion": [
+          [
+            50,
+            0
+          ],
+          [
+            0,
+            270
+          ]
+        ],
         "val_recall": 1.0
       },
       "tier2_bebop": {
@@ -210,7 +379,20 @@
         "recall": 0.9880952380952381,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9891304347826086,
+        "precision": 1.0,
+        "f1": 0.9940119760479043,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            10,
+            830
+          ]
+        ]
       },
       "tier2_ar": {
         "pr_auc": 0.9999538994313505,
@@ -220,17 +402,30 @@
         ],
         "roc_auc": 0.9995216049382716,
         "prevalence": 0.9101123595505618,
-        "threshold": 0.4119444444444445,
+        "threshold": 0.41194444444444445,
         "recall": 0.9629629629629629,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9662921348314607,
+        "precision": 1.0,
+        "f1": 0.9811320754716981,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            30,
+            780
+          ]
+        ]
       },
       "tier2_phantom": {
         "pr_auc": 1.0,
         "pr_auc_ci95": [
           0.9999999999999998,
-          1.0000000000000002
+          1.0
         ],
         "roc_auc": 1.0,
         "prevalence": 0.7241379310344828,
@@ -238,7 +433,20 @@
         "recall": 0.9523809523809523,
         "fpr": 0.0,
         "false_alarms": 0,
-        "negatives": 80
+        "negatives": 80,
+        "accuracy": 0.9655172413793104,
+        "precision": 1.0,
+        "f1": 0.975609756097561,
+        "confusion": [
+          [
+            80,
+            0
+          ],
+          [
+            10,
+            200
+          ]
+        ]
       }
     }
   },

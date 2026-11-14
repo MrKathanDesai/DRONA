@@ -1,10 +1,18 @@
-"""Run the audio detector over a whole recording, window by window.
+"""Run the audio detector over a whole recording, window by window, and
+optionally fuse it with an RF feed.
 
 Shared by scripts/detect.py and the Streamlit dashboard so both show the
 same numbers. Uses the tier-4 detector with uncertainty flags
 (data/models/detector.joblib, from scripts/eval_uncertainty.py) when it
 exists; otherwise falls back to a plain head, which gives only "drone" /
 "no drone".
+
+RF has no live receiver here either: `RFFeed` replays held-out RF windows of a
+chosen class (DroneRF, Tampere drones never trained on, or receiver noise),
+one 25 ms snapshot per audio window, and `fuse` combines the two with
+data/models/fusion.joblib.
+Audio and RF were never recorded together, so a fused replay is a
+what-if, not a recording.
 """
 from __future__ import annotations
 
@@ -24,6 +32,7 @@ DETECTOR = MODELS / "detector.joblib"
 HEADS = {"tier4": MODELS / "outdoor_head.joblib",
          "tier3": MODELS / "pretrained_head.joblib"}
 SR = A.DEFAULT.sample_rate
+AUDIO_FLAGS = ("low_margin", "unfamiliar", "far_from_drones")
 
 
 def windows(y: np.ndarray, sr: int, hop_s: float) -> tuple[list, list]:
@@ -64,7 +73,10 @@ class LiveDetector:
         if self.det is not None:
             a = self.det.assess(emb)
             df = pd.DataFrame({k: a[k] for k in
-                               ("p", "state", "reason", "margin", "distance", "spread")})
+                               ("p", "state", "reason", "margin", "distance", "spread")
+                               if k in a})
+            for k in AUDIO_FLAGS:          # kept per window for fusion
+                df[k] = a[k]
         else:
             p = self.model.predict_proba(emb)[:, 1]
             df = pd.DataFrame({"p": p, "state": np.where(p >= self.threshold,
@@ -82,3 +94,61 @@ class LiveDetector:
 
 def load(path: str | Path) -> np.ndarray:
     return A.load_mono(path, SR)
+
+
+RF_DETECTOR = MODELS / "rf_detector.joblib"
+FUSION = MODELS / "fusion.joblib"
+RF_V2 = DATA_DIR / "rf_features_v2"
+
+
+class RFFeed:
+    """Held-out RF windows to replay beside an audio recording: the test split
+    of the RF v2 dataset (scripts/train_rf_v2.py), scored by the deployed RF
+    detector with the features it was trained on."""
+
+    def __init__(self):
+        from dronedet.models import rf as M
+        for p in (RF_DETECTOR, FUSION, RF_V2 / "X.npy"):
+            if not p.exists():
+                raise FileNotFoundError(f"{p} missing; run scripts/prepare_rf.py, "
+                                        "eval_rf_tampere.py, train_rf_v2.py and "
+                                        "eval_fusion.py")
+        self.det = joblib.load(RF_DETECTOR)
+        self.fusion = joblib.load(FUSION)
+        self.features = M.MODELS[self.det.info.get("features", M.DEPLOY)][0]
+        X = np.load(RF_V2 / "X.npy")
+        df = pd.read_parquet(RF_V2 / "index.parquet")
+        te = df[df.split == "test"]
+        self.sources: dict[str, np.ndarray] = {}
+        for (src, drone, cat), sub in te.groupby(["source", "drone", "category"]):
+            if src == "dronerf":
+                label = (f"DroneRF drone: {drone}" if drone
+                         else "DroneRF background (no drone)")
+            elif src == "tampere":
+                label = f"Tampere drone, never trained on: {drone}"
+            else:
+                label = f"Receiver noise, no drone: {cat.removeprefix('noise_')} " \
+                        f"({src.removeprefix('noise_')} pipeline)"
+            self.sources[label] = X[sub.index.values]
+
+    def windows(self, source: str, n: int) -> tuple[np.ndarray, dict]:
+        """n RF windows from `source`, in time order, wrapping around; returns
+        their PSDs (n, 2, bins) and the RF detector's assessment."""
+        X = self.sources[source]
+        psd = X[np.arange(n) % len(X)]
+        return psd, self.det.assess(self.features(psd))
+
+
+def fuse(audio_df: pd.DataFrame, fusion, rf_p: np.ndarray | None,
+         rf_flags: dict | None) -> tuple[pd.DataFrame, float]:
+    """Fused state per audio window, and the fused threshold in use.
+    `rf_p=None` means no RF feed (fusion then uses audio evidence alone)."""
+    n = len(audio_df)
+    audio_flags = ({k: audio_df[k].values.astype(bool) for k in AUDIO_FLAGS}
+                   if all(k in audio_df for k in AUDIO_FLAGS) else None)
+    out = fusion.assess({"audio": audio_df.p.values, "rf": rf_p}, n,
+                        {"audio": audio_flags, "rf": rf_flags})
+    return pd.DataFrame({"fused": out["fused"], "llr_audio": out["llr_audio"],
+                         "llr_rf": out["llr_rf"], "fused_state": out["state"],
+                         "fused_reason": out["reason"],
+                         "fused_hit": out["hit"]}), float(out["threshold"])

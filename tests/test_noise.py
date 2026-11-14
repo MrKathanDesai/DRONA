@@ -43,7 +43,7 @@ def test_synth_music_is_finite_tonal_and_seeded():
 def make_bank():
     rng = np.random.default_rng(0)
     clips, cats, groups = [], [], []
-    for cat in ("laughing", "engine", "wind", "rain"):
+    for cat in ("laughing", "engine", "wind", "rain", "speech", "music_real"):
         for g in range(3):
             clips.append(rng.standard_normal(16000).astype(np.float32) * 0.1)
             cats.append(cat)

@@ -1,0 +1,51 @@
+{
+  "target_fpr": 0.01,
+  "review_rate": 0.1,
+  "familiar_quantile": 0.95,
+  "threshold": 0.26169444444444456,
+  "margin_logit": 3.310007421987054,
+  "tier1": {
+    "windows": 320,
+    "error_rate": 0.003125,
+    "flagged_rate": 0.134375,
+    "errors_caught": 1.0,
+    "states": {
+      "drone": 245,
+      "low confidence": 43,
+      "no drone": 32
+    },
+    "risk_coverage_margin": {
+      "error_at_coverage": {
+        "100%": 0.003125,
+        "90%": 0.0,
+        "80%": 0.0,
+        "70%": 0.0,
+        "50%": 0.0
+      },
+      "aurc": 9.765625e-06
+    }
+  },
+  "open_set": {
+    "bebop": {
+      "auroc": 0.9676349206349205,
+      "flagged_unknown": 0.9142857142857143,
+      "flagged_known": 0.02666666666666667,
+      "unknown_windows": 840,
+      "known_windows": 150
+    },
+    "ar": {
+      "auroc": 0.44754732510288064,
+      "flagged_unknown": 0.0,
+      "flagged_known": 0.03333333333333333,
+      "unknown_windows": 810,
+      "known_windows": 150
+    },
+    "phantom": {
+      "auroc": 0.9675,
+      "flagged_unknown": 0.9285714285714286,
+      "flagged_known": 0.025,
+      "unknown_windows": 210,
+      "known_windows": 240
+    }
+  }
+}
