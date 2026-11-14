@@ -46,9 +46,18 @@ Combined work from branches `001-vidhi` (Vidhi) and `002` (Kathan).
   An upper bound, since audio and RF pairs are not co-recorded.
 - **Dashboard:** Vidhi's 6-tab layout, with Kathan's RF feed + fused live state
   and the fusion results merged in. `streamlit run app/dashboard.py`.
+- **Dashboard, professor-facing pass:** project briefing first (readiness read
+  from files in `data/`, how a prediction is made, the four states, headline
+  results with denominators and sources, what the results do / do not show,
+  blockers); replay page with the recording-level result first, separate audio
+  / RF / decision-rule evidence, RF clearly marked as recorded replay; evidence
+  sum is the default rule and the learned layer is labelled experimental;
+  System / Light / Dark theme (`.streamlit/config.toml`). Logic in
+  `src/dronedet/status.py`, tested in `tests/test_status.py`.
 
 ## Tests
-- 137 passing (`python -m pytest -q`).
+- 182 passing (`python -m pytest -q`; `tests/test_console.py` needs
+  `pip install -r console/requirements.txt`).
 
 ## Outdoor validation and learning loop
 - Outdoor aircraft (AeroSonicDB, held-out sessions): no alarms on 99 aircraft or
@@ -57,6 +66,13 @@ Combined work from branches `001-vidhi` (Vidhi) and `002` (Kathan).
   rollback (`src/dronedet/feedback.py`): Kathan.
 
 ## Still open
+- (Done 14 Nov 2026) RF/fusion artifacts rebuilt locally from verified data:
+  DroneRF cache (23/23 archives, segment counts match the paper), Tampere
+  (12/12 checksums), `rf_forest`, `rf_trust`, `rf_detector` (v2) and both
+  fusion files. Every regenerated report matches the earlier one except the
+  small RF v1 1D-CNN (recall changes of 0.01-0.04; CPU training is not
+  bit-for-bit repeatable) and last-digit changes in fusion/calibration.
+- No RF receiver integration: RF in the dashboard and console is recorded replay.
 - Independent RF validation: the KU Leuven Drone RF dataset (new receiver,
   43.5 GB) needs a download request and shows no background recordings; CardRF
   (with Wi-Fi / Bluetooth) needs an IEEE DataPort login.

@@ -8,6 +8,16 @@ python -m console                  # live detection page, http://localhost:8080
 streamlit run app/dashboard.py     # results and evaluation dashboard
 ```
 
+**AI Lab project, Ahmedabad University** (instructor: Prof. Maitrik Shah).
+Team: Vidhi Rojasara (AU2644022) and Kathan Desai (AU2644002).
+
+| Deliverable | Where |
+|---|---|
+| Project report (LaTeX) | `report/report.tex` (compile with pdfLaTeX, e.g. Overleaf) |
+| Presentation, 12 slides (LaTeX Beamer) | `presentation/slides.tex` |
+| Results, one page per experiment | `reports/*.md` (raw numbers in `reports/*.json`); summary in `PROJECT_SUMMARY.md` |
+| Demo | `streamlit run app/dashboard.py`; video script in `presentation/video_script_and_post.md` |
+
 ## Status
 
 | Step | What | State |
@@ -22,13 +32,13 @@ streamlit run app/dashboard.py     # results and evaluation dashboard
 | 4 | Noise stress test (6 conditions x 3 SNRs) + noise-augmentation ablation | **done** — see `reports/noise_robustness.md` |
 | 5 | Uncertainty flags (review band, familiarity, ensemble) | **done** — see `reports/uncertainty_audio.md` |
 | 6 | Open-set "unknown drone" (train Bebop, test Mambo) | **done, AUROC 0.81** — same report |
-| 6b | Streamlit dashboard: 6 tabs (overview, audio, RF, fusion, live feed with Grad-CAM + optional RF, proposal checklist), `detect.py` on the tier-4 detector | **done** — `streamlit run app/dashboard.py` |
+| 6b | Streamlit dashboard: project briefing (readiness checked from files on disk, how a prediction is made, the four states, headline results, limits), replay detector (recording-level result first, per-sensor evidence, Grad-CAM, optional recorded-RF replay), fusion, audio, RF, proposal checklist; System / Light / Dark theme. `detect.py` on the tier-4 detector | **done** — `streamlit run app/dashboard.py`; see "Reading the dashboard" below |
 | 7 | Audio model comparison: CNN vs CNN+GRU vs CNN+LSTM vs transformer | **done** — see `reports/deep_audio.md`, `reports/audio_architecture_comparison.md` |
 | 8 | Which-drone confusion matrices (audio, RF) | **done** — see `reports/identify.md` |
 | 9 | RF uncertainty + unknown-signature flags | **done** — see `reports/rf_uncertainty.md` |
 | 10 | RF on a new receiver (Tampere) + white-noise control | **done: RF v1 calls pure noise "drone"** — see `reports/rf_tampere.md` |
 | 10b | RF v2: relabelled silence, receiver-noise negatives, second-receiver drones | **done: noise is "no drone", 9/10 unseen drones caught** — see `reports/rf_v2.md` |
-| 11 | Audio + RF fusion, ablation, dashboard RF panel | **done** — see `reports/fusion.md` |
+| 11 | Audio + RF fusion, ablation, dashboard RF panel | **evaluated (unpaired-data upper bound)** — evidence sum deployed; the learned layer is evaluated but not deployed (0.2% recall on RF-silent drones vs 18.4% for the sum); see `reports/fusion.md`. Rebuilt and re-verified on 14 Nov 2026 (`rf_detector.joblib`, `fusion_models.joblib`); the dashboard replays recorded RF windows and shows the fused decision |
 | 12 | Real speech + music in the noise test | **done** — in `reports/noise_robustness.md` |
 | 12b | RF v3 experiment: simulated Wi-Fi / Bluetooth / microwave negatives, forest vs 1D-CNN, 3-of-5 smoothing, time-frequency features | **done** — see `reports/rf_v3.md` |
 | 12c | RF probability calibration + held-out Phantom (Vidhi) | **done** — see `reports/rf_trust.md` |
@@ -42,6 +52,96 @@ streamlit run app/dashboard.py     # results and evaluation dashboard
 | 17 | Operator-in-the-loop learning: labelled incidents retrain the detector behind a champion/challenger safety gate, with versions and rollback | **done** — `src/dronedet/feedback.py`, `scripts/retrain_feedback.py` |
 | open | Independent RF validation with background recordings (KU Leuven / CardRF need a request or login) and paired audio + RF for fusion (no public co-recorded set found) | needs data |
 | next | Real Wi-Fi / Bluetooth recordings (CardRF / DroneDetect) to measure RF false alarms on real traffic | needs a DataPort / CardRF login |
+
+## Reading the dashboard
+
+**What it is.** A research dashboard over recorded datasets. Nothing in it is
+connected to a live microphone array or an RF receiver, and nothing in it is
+field-validated. (The live microphone page is the separate console,
+`python -m console`.)
+
+**The four states** (per 1-second window, and summarised per recording):
+
+| State | Meaning |
+|---|---|
+| No Drone | The available sensor evidence is below the decision threshold. Not proof that no drone is physically present. |
+| Known Drone | Drone-like evidence above the threshold, without the unknown-signature flag. "Resembles the drones in training", **not** an identification of the drone model. |
+| Unknown Drone | Drone-like evidence above the threshold, with a signature unlike every training drone. |
+| Low Confidence | Ambiguous, near the review boundary, or unlike the training data: a person should review it. |
+
+A recording raises **Known/Unknown Drone** only after N consecutive drone
+windows (sidebar setting, default 2); isolated hits or repeated
+low-confidence windows give **Low Confidence**. This is the same rule as the
+console (`console/server.py`). The rule lives in `src/dronedet/status.py`.
+
+**Scores.** The audio score (0–1) and the RF score are model scores, **not
+calibrated probabilities**. Fused values are log-likelihood ratios (positive
+favours drone). Thresholds are set for 1% false alarms on validation data.
+
+**What a result is, and is not:**
+
+- *Single-window prediction*: one 1-s window; never an alarm on its own.
+- *Recording-level summary*: the consecutive-window rule above, on one recording.
+- *Experimental replay*: with an RF source selected, recorded RF **test**
+  windows of the chosen class are replayed beside the audio. They were never
+  recorded with that audio, so a fused result is an unpaired what-if, not a
+  synchronized multimodal decision.
+- *Field-validated outcome*: none exists yet (needs field recordings).
+
+**Reports vs. artifacts.** A report in `reports/` (e.g. `fusion.md`,
+`rf_v2.md`) can exist without the model file it describes. The briefing page
+checks `data/` directly. On a fresh copy of the project, the RF and fusion
+models must be rebuilt in this order:
+
+```bash
+python scripts/prepare_rf.py --verify          # 23 DroneRF archives, SHA-256
+python scripts/prepare_rf.py --process-only --workers 3   # -> data/rf_features/ (1-3 h; ~0.4 GB RAM per worker)
+python scripts/train_rf.py                     # -> rf_forest.joblib (v1, diagnostic only)
+python scripts/eval_rf_trust.py                # -> rf_trust.joblib  (RF research tab)
+python scripts/download_data.py --only-extra   # Tampere RF (5.3 GB) + speech/music noise (1.6 GB)
+python scripts/eval_rf_tampere.py              # -> data/rf_features_tampere/
+python scripts/train_rf_v2.py                  # -> rf_detector.joblib + data/rf_features_v2/
+python scripts/eval_fusion.py                  # -> fusion.joblib (sum) + fusion_models.joblib (all rules)
+```
+
+`fusion_models.joblib` holds every rule and names the deployed one (the sum);
+a project that only has the older `fusion.joblib` still replays with the sum.
+
+**Audio input** (the **ACOUSTIC-01** tile on the *Replay detector* page; the RF feed and fusion rule are in the **RADIO-01** tile, and Theme and Replay settings in the collapsible sidebar):
+
+- dataset recordings: Svanström outdoor, DroneAudioDataset, ITU ARIS;
+- **any audio or video file**: WAV, MP3, M4A, FLAC, OGG, AAC, MP4, MOV, WEBM,
+  MKV, AVI, … (video is used for its sound only);
+- **a link**: YouTube and most video sites (via `yt-dlp`), or a direct link to
+  an audio/video file;
+- **the microphone**: record a few seconds in the browser.
+
+Everything is decoded to 16 kHz mono (`src/dronedet/media.py`, bundled ffmpeg
+from `imageio-ffmpeg`); at most the first 5 minutes are analysed. Expect
+misses on outdoor or internet clips: outdoors the detector catches about a
+fifth of drone windows (see the results). Use only clips you may use.
+
+**Look.** The dashboard uses the operations console's design (the approved
+UI in `console/static/index.html`): the "DRONA" top bar with a state badge
+(STANDBY until a clip is analysed, then that clip's final state), sensor
+status dots and a UTC clock; hairline panels; small uppercase labels; the
+console's colours. The first page, *Replay detector*, uses the console's
+three-column layout: sensor tiles (ACOUSTIC-01, RADIO-01, MODEL) with their
+controls on the left, the site sensor-coverage map and acoustic spectrum in
+the middle (with the full result below), and an incident list with CSV export
+on the right.
+
+**Theme.** The dashboard opens in **Dark**. Sidebar → Theme switches to System
+(follows the OS/browser) or Light. The choice is kept in the URL
+(`?theme=light`), so it survives reruns and reloads; it drives Streamlit's own
+theme setting (`.streamlit/config.toml` defines both palettes), so tables,
+charts and widgets switch with it.
+
+**Detail level.** The Audio and RF tabs show their headline result and the
+full reports; the long experiment tables are behind a *Show detailed tables*
+switch. Only values stored in `reports/` are shown (nothing recomputed in the
+dashboard). Each model's training settings and epochs are in the project
+report, `report/report.tex` (Section "Model training details").
 
 ## Setup
 
@@ -73,7 +173,7 @@ python scripts/train_rf.py              # RF detectors + quiet-window check
 python scripts/eval_rf_uncertainty.py   # RF v1 flags and open set
 python scripts/eval_rf_tampere.py       # RF v1 on a new receiver + white-noise control
 python scripts/train_rf_v2.py           # RF v2, saves data/models/rf_detector.joblib
-python scripts/eval_fusion.py           # audio + RF fusion ablation, saves fusion.joblib
+python scripts/eval_fusion.py           # ablation; saves sum + learned fusion models
 python scripts/train_rf_v3.py           # RF v3 experiment (simulated Wi-Fi/BT/microwave), report only
 python scripts/eval_rf_trust.py         # RF calibration + Phantom held-out unknown test
 python scripts/train_audio_baseline.py  # Vidhi: random-forest audio baseline
@@ -388,7 +488,7 @@ scripts/eval_identify.py      which-drone confusion matrices
 scripts/eval_rf_uncertainty.py RF v1 flags, saves data/models/rf_detector_dronerf.joblib
 scripts/eval_rf_tampere.py    RF v1 on a new receiver, white-noise control
 scripts/train_rf_v2.py        RF v2 (deployed), saves data/models/rf_detector.joblib
-scripts/eval_fusion.py        fusion ablation, saves data/models/fusion.joblib
+scripts/eval_fusion.py        fusion ablation; saves sum + learned models for replay
 scripts/detect.py             run the detector on any audio file
 scripts/make_figures.py       six presentation figures (spectrograms, results, timelines)
 reports/baseline_audio.{md,json}
