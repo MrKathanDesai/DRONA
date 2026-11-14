@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 # pyrefly: ignore [missing-import]
 from dronedet.data import manifest as M
+from dronedet.paths import DATA_DIR
 
 MANIFEST = ROOT / "data" / "manifest.parquet"
 pytestmark = pytest.mark.skipif(
@@ -19,7 +20,15 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def df():
-    return pd.read_parquet(MANIFEST)
+    data = pd.read_parquet(MANIFEST)
+    if "start_s" not in data:
+        data["start_s"] = float("nan")
+        data["path"] = data.path.map(
+            lambda path: Path(path).relative_to(DATA_DIR).as_posix()
+            if Path(path).is_absolute() else path)
+    if "split_tier4" not in data:
+        data["split_tier4"] = data["split_tier3"]
+    return data
 
 
 def test_no_group_spans_a_split(df):

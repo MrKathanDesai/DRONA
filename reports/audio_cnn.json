@@ -1,0 +1,241 @@
+{
+  "project": "DRONA audio CNN",
+  "model": {
+    "name": "AudioCNN",
+    "input": "64-bin log-mel spectrogram; centered 1-second waveform window, center-cropped when longer and zero-padded when shorter",
+    "input_shape": [
+      1,
+      64,
+      101
+    ],
+    "sample_rate_hz": 16000,
+    "n_fft": 512,
+    "hop_length": 160,
+    "architecture": "Three Conv2d-BatchNorm-ReLU blocks (16, 32, 64 channels), max-pooling after first two blocks, adaptive global average pooling, dropout 0.3, binary logit",
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 128,
+    "max_epochs": 20,
+    "early_stopping_patience": 4,
+    "loss": "BCEWithLogitsLoss with training-set positive-class weight",
+    "device": "cpu",
+    "random_state": 42
+  },
+  "split_policy": "Existing manifest Tier 1 recording-group split; best epoch selected by validation PR-AUC and threshold selected by validation F1",
+  "counts": {
+    "usable_clips": 11702,
+    "excluded_manifest_clips": 2,
+    "clips_by_split": {
+      "train": {
+        "background": 7166,
+        "drone": 900,
+        "groups": 1578
+      },
+      "val": {
+        "background": 1445,
+        "drone": 187,
+        "groups": 336
+      },
+      "test": {
+        "background": 1759,
+        "drone": 245,
+        "groups": 401
+      }
+    }
+  },
+  "training": {
+    "epochs_run": 11,
+    "best_epoch": 7,
+    "best_validation_pr_auc": 0.9515542401113815,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 0.7326159755083458,
+        "validation_pr_auc": 0.8029108816237639,
+        "validation_f1_at_0_5": 0.5314900153609831
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.5715283618918017,
+        "validation_pr_auc": 0.8850688337221787,
+        "validation_f1_at_0_5": 0.5089408528198074
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.4402356855100182,
+        "validation_pr_auc": 0.912024481057051,
+        "validation_f1_at_0_5": 0.629059829059829
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.3907279080473221,
+        "validation_pr_auc": 0.9138077946394894,
+        "validation_f1_at_0_5": 0.7317073170731707
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.31915749873649146,
+        "validation_pr_auc": 0.9321129786569016,
+        "validation_f1_at_0_5": 0.5570776255707762
+      },
+      {
+        "epoch": 6,
+        "train_loss": 0.30287113289900464,
+        "validation_pr_auc": 0.9051584707462745,
+        "validation_f1_at_0_5": 0.7546296296296297
+      },
+      {
+        "epoch": 7,
+        "train_loss": 0.2927087273752604,
+        "validation_pr_auc": 0.9515542401113815,
+        "validation_f1_at_0_5": 0.817966903073286
+      },
+      {
+        "epoch": 8,
+        "train_loss": 0.25811789344978664,
+        "validation_pr_auc": 0.9503067193233643,
+        "validation_f1_at_0_5": 0.7865168539325843
+      },
+      {
+        "epoch": 9,
+        "train_loss": 0.23813773527235244,
+        "validation_pr_auc": 0.9416173945916456,
+        "validation_f1_at_0_5": 0.7298387096774194
+      },
+      {
+        "epoch": 10,
+        "train_loss": 0.2223808838125201,
+        "validation_pr_auc": 0.9434139439080491,
+        "validation_f1_at_0_5": 0.3702970297029703
+      },
+      {
+        "epoch": 11,
+        "train_loss": 0.2170567416151611,
+        "validation_pr_auc": 0.9267781994830065,
+        "validation_f1_at_0_5": 0.8232189973614775
+      }
+    ]
+  },
+  "checkpoint": "reports\\models\\audio_cnn_state_dict.pt",
+  "validation": {
+    "threshold_maximizing_f1": 0.5950185060501099,
+    "f1_at_threshold": 0.8736842105263158
+  },
+  "test": {
+    "threshold_0_5": {
+      "threshold": 0.5,
+      "precision": 0.8114478114478114,
+      "recall": 0.9836734693877551,
+      "f1": 0.8892988929889298,
+      "pr_auc": 0.9894371549505122,
+      "roc_auc": 0.998336253205091,
+      "confusion_matrix": [
+        [
+          1703,
+          56
+        ],
+        [
+          4,
+          241
+        ]
+      ],
+      "classification_report": {
+        "background": {
+          "precision": 0.9976567076742824,
+          "recall": 0.9681637293916998,
+          "f1-score": 0.9826889786497404,
+          "support": 1759.0
+        },
+        "drone": {
+          "precision": 0.8114478114478114,
+          "recall": 0.9836734693877551,
+          "f1-score": 0.8892988929889298,
+          "support": 245.0
+        },
+        "accuracy": 0.9700598802395209,
+        "macro avg": {
+          "precision": 0.9045522595610469,
+          "recall": 0.9759185993897275,
+          "f1-score": 0.9359939358193351,
+          "support": 2004.0
+        },
+        "weighted avg": {
+          "precision": 0.9748916480058766,
+          "recall": 0.9700598802395209,
+          "f1-score": 0.9712715280574756,
+          "support": 2004.0
+        }
+      }
+    },
+    "validation_tuned_threshold": {
+      "threshold": 0.5950185060501099,
+      "precision": 0.9073359073359073,
+      "recall": 0.9591836734693877,
+      "f1": 0.9325396825396826,
+      "pr_auc": 0.9894371549505122,
+      "roc_auc": 0.998336253205091,
+      "confusion_matrix": [
+        [
+          1735,
+          24
+        ],
+        [
+          10,
+          235
+        ]
+      ],
+      "classification_report": {
+        "background": {
+          "precision": 0.994269340974212,
+          "recall": 0.9863558840250142,
+          "f1-score": 0.990296803652968,
+          "support": 1759.0
+        },
+        "drone": {
+          "precision": 0.9073359073359073,
+          "recall": 0.9591836734693877,
+          "f1-score": 0.9325396825396826,
+          "support": 245.0
+        },
+        "accuracy": 0.9830339321357285,
+        "macro avg": {
+          "precision": 0.9508026241550597,
+          "recall": 0.9727697787472009,
+          "f1-score": 0.9614182430963253,
+          "support": 2004.0
+        },
+        "weighted avg": {
+          "precision": 0.9836412515324033,
+          "recall": 0.9830339321357285,
+          "f1-score": 0.9832356785667629,
+          "support": 2004.0
+        }
+      }
+    }
+  },
+  "baseline_comparison": {
+    "random_forest": {
+      "precision": 0.9234042553191489,
+      "recall": 0.8857142857142857,
+      "f1": 0.9041666666666667,
+      "pr_auc": 0.9535205557267453,
+      "roc_auc": 0.9864138947221868
+    },
+    "cnn": {
+      "precision": 0.9073359073359073,
+      "recall": 0.9591836734693877,
+      "f1": 0.9325396825396826,
+      "pr_auc": 0.9894371549505122,
+      "roc_auc": 0.998336253205091
+    },
+    "cnn_minus_random_forest": {
+      "precision": -0.016068347983241638,
+      "recall": 0.07346938775510203,
+      "f1": 0.028373015873015883,
+      "pr_auc": 0.03591659922376689,
+      "roc_auc": 0.011922358482904238
+    },
+    "note": "Both models use the same Tier 1 split, but distinct input representations and validation-selected thresholds."
+  }
+}

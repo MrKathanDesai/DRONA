@@ -9,8 +9,8 @@ Errors are counted at the frozen 1%-FPR threshold. AURC = area under the risk-co
 | tier | error rate | flagged | error rate, unflagged | share of errors flagged | unfamiliar | AURC margin | AURC spread | AURC distance | AURC random |
 |---|---|---|---|---|---|---|---|---|---|
 | tier 1 (indoor held-out) | 0.020 | 0.127 | 0.005 | 0.800 | 0.058 | 0.003 | 0.014 | 0.021 | 0.017 |
-| tier 3 (indoor -> outdoor) | 0.244 | 0.418 | 0.218 | 0.482 | 0.017 | 0.179 | 0.300 | 0.315 | 0.244 |
-| tier 4 (+ outdoor training) | 0.267 | 0.116 | 0.245 | 0.188 | 0.019 | 0.188 | 0.315 | 0.349 | 0.273 |
+| tier 3 (indoor -> outdoor) | 0.246 | 0.418 | 0.218 | 0.484 | 0.017 | 0.179 | 0.299 | 0.315 | 0.246 |
+| tier 4 (+ outdoor training) | 0.267 | 0.116 | 0.245 | 0.188 | 0.019 | 0.188 | 0.314 | 0.349 | 0.273 |
 
 ![risk coverage](figures/10_risk_coverage.png)
 
@@ -20,7 +20,7 @@ Errors are counted at the frozen 1%-FPR threshold. AURC = area under the risk-co
 
 | | no drone | drone | unknown drone | low confidence |
 |---|---|---|---|---|
-| background | 1571 | 0 | 0 | 188 |
+| background | 1570 | 0 | 0 | 189 |
 | drone | 8 | 171 | 0 | 66 |
 
 **tier 3 (indoor -> outdoor)**
@@ -54,9 +54,9 @@ Familiarity fitted on Bebop drone windows from 70% of Bebop/background recording
 ## What this shows
 
 - **The margin is the useful signal.** Ranking by distance from the threshold beats random on every tier. On tier 1, the 13% of windows sent to review hold 80% of the errors.
-- **The familiarity flag does not detect the move outdoors.** Only 1.7% of SvanstrÃ¶m windows are flagged unfamiliar to the indoor-only model, and ranking by distance is no better than random. The outdoor shift apparently lies outside the 64 main directions of the training embeddings. A residual-based distance might catch it, but choosing it now would mean tuning on the test set, so it is left for a new test set.
-- **Ensemble spread adds nothing** over the margin here: the head is strongly regularised, so bootstrap members agree.
-- **Open set works in ranking, less in calibration.** Mambo is farther from known drones than held-out Bebop (AUROC above), but the flag rate on held-out Bebop is above the nominal 5% because the calibration split holds few recordings. Mambo rarely scores above the drone threshold, so most Mambo windows end as low confidence, not unknown drone.
+- **The familiarity flag does not detect the move outdoors.** Only 1.7% of Svanström windows are flagged unfamiliar to the indoor-only model, and ranking by distance is no better than random. The outdoor shift apparently lies outside the 64 main directions of the training embeddings. A residual-based distance might catch it, but choosing it now would mean tuning on the test set, so it is left for a new test set.
+- **Ensemble spread adds nothing.** It is worse than the margin on every tier and no better than random outdoors, so it is shown in the dashboard as a number but not used for flags.
+- **Open set works in ranking, less in calibration.** Mambo is farther from known drones than held-out Bebop (AUROC above), but the flag rate on held-out Bebop is above the nominal 5%, probably because the calibration split holds few recordings. Mambo rarely scores above the drone threshold, so most Mambo windows end as low confidence, not unknown drone.
 
 ## Caveats
 

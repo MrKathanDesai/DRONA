@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -55,6 +55,7 @@ def test_names_including_the_misspelt_archive():
     assert R.archive_key("FR Data_00000_H2.rar") == "00000_H2"
     assert R.parse_member("11000L_9.csv") == ("11000", "L", 9)
     assert R.parse_member("folder/10111H_17.csv") == ("10111", "H", 17)
+    assert R.parse_member(r"RF Data_00000_L1\00000L_0.csv") == ("00000", "L", 0)
     with pytest.raises(ValueError):
         R.parse_member("readme.txt")
 
@@ -114,8 +115,9 @@ def test_archive_stream_keeps_members_apart(tmp_path, monkeypatch):
     (tmp_path / "10000L_0.csv").write_text("1.000000,2.000000,3.000000,4.000000\r\n")
     (tmp_path / "10000L_1.csv").write_text("5.000000,6.000000,7.000000,8.000000\r\n")
     arc = tmp_path / "a.zip"
-    subprocess.run(["bsdtar", "-a", "-cf", str(arc), "-C", str(tmp_path),
-                    "10000L_0.csv", "10000L_1.csv"], check=True)
+    with zipfile.ZipFile(arc, "w") as archive:
+        archive.write(tmp_path / "10000L_0.csv", "10000L_0.csv")
+        archive.write(tmp_path / "10000L_1.csv", "10000L_1.csv")
     got = dict(R.iter_archive(arc))
     assert got["10000L_0.csv"].tolist() == [1, 2, 3, 4]
     assert got["10000L_1.csv"].tolist() == [5, 6, 7, 8]

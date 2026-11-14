@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import soundfile as sf
+from sklearn.model_selection import train_test_split
 
 from dronedet.paths import DATA_DIR
 
@@ -137,6 +138,53 @@ def build_svanstrom(root: Path, window_s: float = 1.0,
     df["split_tier1"] = df["split_tier2"] = "excluded"
     df["split_tier3"] = df["split_tier4"] = "test"
     return df
+
+
+def split_svanstrom_confusers(df: pd.DataFrame, seed: int = 0) -> dict[str, str]:
+    """Split outdoor negative recordings for a separate confuser-training run.
+
+    All Svanström drone recordings remain held out. Helicopter and outdoor
+    background recordings are split by recording into 60/20/20 train/val/test.
+    """
+    required = {"source", "group_id", "label", "category"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"missing columns for Svanström split: {sorted(missing)}")
+
+    svan = df.loc[df.source == "svanstrom"]
+    if svan.empty:
+        raise ValueError("no Svanström rows are available")
+
+    group_counts = svan.groupby("group_id")[["label", "category"]].nunique()
+    if (group_counts > 1).any().any():
+        raise ValueError("Svanström recording groups contain mixed labels or categories")
+    groups = svan.groupby("group_id", as_index=False).agg(
+        label=("label", "first"), category=("category", "first")
+    )
+    negatives = groups.loc[groups.label == "background"]
+    categories = sorted(negatives.category.unique())
+    if len(categories) < 2 or negatives.group_id.nunique() < 15:
+        raise ValueError("need at least two outdoor negative categories and 15 recordings")
+
+    train_val, test = train_test_split(
+        negatives.group_id.to_numpy(),
+        test_size=0.2,
+        random_state=seed,
+        stratify=negatives.category,
+    )
+    train_categories = negatives.set_index("group_id").loc[train_val, "category"]
+    train, val = train_test_split(
+        train_val,
+        test_size=0.25,
+        random_state=seed,
+        stratify=train_categories,
+    )
+    assignment = {group: "train" for group in train}
+    assignment.update({group: "val" for group in val})
+    assignment.update({group: "test" for group in test})
+    assignment.update({group: "test" for group in groups.loc[
+        groups.label == "drone", "group_id"]})
+    return assignment
 
 
 def build_aris(root: Path, data_dir: Path = DATA_DIR) -> pd.DataFrame:

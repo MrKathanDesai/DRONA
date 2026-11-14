@@ -1,0 +1,334 @@
+{
+  "title": "DroneDetect V2 matched-mode model-code classification",
+  "source_url": "https://ieee-dataport.org/open-access/dronedetect-dataset-radio-frequency-dataset-unmanned-aerial-system-uas-signals-machine",
+  "doi": "10.21227/5jjj-1m32",
+  "scope": "Exploratory classification between filename prefixes on matched flight modes; not drone detection.",
+  "recording_count": 20,
+  "available_recording_count": 25,
+  "window_count": 2000,
+  "window_seconds": 0.02,
+  "feature": "64-band summary of per-window, two-sided Welch log-PSD; per-window mean removed",
+  "split": "5-fold stratified group CV; all windows from each recording stay in one fold",
+  "threshold": 0.5,
+  "classes": [
+    "MA1",
+    "MAV"
+  ],
+  "metrics": {
+    "recording_accuracy": 1.0,
+    "recording_balanced_accuracy": 1.0,
+    "recording_macro_f1": 1.0,
+    "recording_roc_auc": 1.0,
+    "by_mode": {
+      "hovering": {
+        "recording_count": 10,
+        "accuracy": 1.0,
+        "balanced_accuracy": 1.0,
+        "macro_f1": 1.0
+      },
+      "flying": {
+        "recording_count": 10,
+        "accuracy": 1.0,
+        "balanced_accuracy": 1.0,
+        "macro_f1": 1.0
+      }
+    },
+    "classification_report": {
+      "MA1": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 10.0
+      },
+      "MAV": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 10.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 20.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 20.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        10,
+        0
+      ],
+      [
+        0,
+        10
+      ]
+    ]
+  },
+  "coverage": {
+    "interference_codes": [
+      "01"
+    ],
+    "interference": [
+      "bluetooth"
+    ],
+    "model_codes": {
+      "MA1": 10,
+      "MAV": 10
+    },
+    "modes": [
+      "flying",
+      "hovering"
+    ],
+    "mode_counts_by_code": {
+      "hovering": {
+        "MA1": 5,
+        "MAV": 5
+      },
+      "flying": {
+        "MA1": 5,
+        "MAV": 5
+      }
+    },
+    "excluded_unmatched_mode_recordings": 5,
+    "complete_windows_per_recording": [
+      100
+    ]
+  },
+  "limitations": [
+    "Only 20 of 25 local recordings are evaluated: two filename prefixes, Bluetooth-only, and matched hovering/flying modes.",
+    "Five switched-on recordings are excluded because the MAV prefix has no switched-on examples.",
+    "No background/no-drone captures are present, so binary detection metrics are not valid.",
+    "The local subset is too small to support deployment or generalization claims.",
+    "Recording-level folds prevent window leakage, but captures may share the same setup.",
+    "Model codes are reported as filenames; the experiment does not infer a deployed identity."
+  ],
+  "recordings": [
+    {
+      "file": "MA1_0101_00.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "00",
+      "fold": 5,
+      "mean_score_for_second_class": 0.4159826636314392,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 4606
+    },
+    {
+      "file": "MA1_0101_01.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "01",
+      "fold": 2,
+      "mean_score_for_second_class": 0.3881360590457916,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 8191
+    },
+    {
+      "file": "MA1_0101_02.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "02",
+      "fold": 4,
+      "mean_score_for_second_class": 0.4183155298233032,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 4606
+    },
+    {
+      "file": "MA1_0101_03.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "03",
+      "fold": 2,
+      "mean_score_for_second_class": 0.39695170521736145,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 4605
+    },
+    {
+      "file": "MA1_0101_04.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "04",
+      "fold": 3,
+      "mean_score_for_second_class": 0.4282436668872833,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 4605
+    },
+    {
+      "file": "MA1_0110_00.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "00",
+      "fold": 1,
+      "mean_score_for_second_class": 0.37845131754875183,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 4605
+    },
+    {
+      "file": "MA1_0110_01.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "01",
+      "fold": 1,
+      "mean_score_for_second_class": 0.3875412046909332,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 4605
+    },
+    {
+      "file": "MA1_0110_02.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "02",
+      "fold": 4,
+      "mean_score_for_second_class": 0.4707413911819458,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 4605
+    },
+    {
+      "file": "MA1_0110_03.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "03",
+      "fold": 5,
+      "mean_score_for_second_class": 0.40161722898483276,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 509
+    },
+    {
+      "file": "MA1_0110_04.dat",
+      "model_code": "MA1",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "04",
+      "fold": 3,
+      "mean_score_for_second_class": 0.3750380575656891,
+      "predicted_code": "MA1",
+      "tail_samples_dropped": 4606
+    },
+    {
+      "file": "MAV_0101_00.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "00",
+      "fold": 3,
+      "mean_score_for_second_class": 0.5667796730995178,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 4605
+    },
+    {
+      "file": "MAV_0101_01.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "01",
+      "fold": 1,
+      "mean_score_for_second_class": 0.6049343943595886,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 511
+    },
+    {
+      "file": "MAV_0101_02.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "02",
+      "fold": 4,
+      "mean_score_for_second_class": 0.5639522075653076,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 4606
+    },
+    {
+      "file": "MAV_0101_03.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "03",
+      "fold": 5,
+      "mean_score_for_second_class": 0.6124284267425537,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 4607
+    },
+    {
+      "file": "MAV_0101_04.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "hovering",
+      "take": "04",
+      "fold": 2,
+      "mean_score_for_second_class": 0.5746641159057617,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 4604
+    },
+    {
+      "file": "MAV_0110_00.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "00",
+      "fold": 3,
+      "mean_score_for_second_class": 0.6127616167068481,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 4601
+    },
+    {
+      "file": "MAV_0110_01.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "01",
+      "fold": 5,
+      "mean_score_for_second_class": 0.5658049583435059,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 4605
+    },
+    {
+      "file": "MAV_0110_02.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "02",
+      "fold": 2,
+      "mean_score_for_second_class": 0.7840617299079895,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 4605
+    },
+    {
+      "file": "MAV_0110_03.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "03",
+      "fold": 1,
+      "mean_score_for_second_class": 0.5781948566436768,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 511
+    },
+    {
+      "file": "MAV_0110_04.dat",
+      "model_code": "MAV",
+      "interference": "bluetooth",
+      "mode": "flying",
+      "take": "04",
+      "fold": 4,
+      "mean_score_for_second_class": 0.557365357875824,
+      "predicted_code": "MAV",
+      "tail_samples_dropped": 4605
+    }
+  ]
+}

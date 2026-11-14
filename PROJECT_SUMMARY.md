@@ -7,13 +7,14 @@
 | Module | Status |
 |---|---|
 | **Audio** | Works well indoors and on unseen drones. Outdoors it is weak: it catches about 22–33% of drone windows and is confused by helicopters. |
-| **Audio model comparison** | Done (section 6b). **A small CNN trained from scratch is the best outdoor model**: PR-AUC 0.831 vs 0.649 for the pretrained encoder, drone vs helicopter 0.91 vs 0.58. |
-| **RF** | **v1 did not detect drones** (it called pure noise "drone"). **v2, retrained, does:** noise and silent windows are "no drone", and 9 of 10 drones from another receiver it never trained on are caught (section 7). False alarms on real-world Wi-Fi / Bluetooth are still unmeasured. |
+| **Audio model comparison** | Done (section 6b, plus Vidhi's CNN+LSTM run in `audio_architecture_comparison.md`). **A small CNN trained from scratch is the best outdoor model**: PR-AUC 0.831 vs 0.649 for the pretrained encoder, drone vs helicopter 0.91 vs 0.58. |
+| **RF** | **v1 did not detect drones** (it called pure noise "drone"). **v2, retrained, does:** noise and silent windows are "no drone", and 9 of 10 drones from another receiver it never trained on are caught (section 7). False alarms on real-world Wi-Fi / Bluetooth are still unmeasured; **v3** tests simulated Wi-Fi / Bluetooth / microwave (`rf_v3.md`). |
 | **Identification** | Done. Which-drone confusion matrices: audio balanced accuracy 0.89, RF 0.94 (RF carries the caveat). |
 | **Noise robustness** | Done, now with real speech and music. Holds at 20 dB SNR; at 0 dB recall drops to 0.27–0.74. Noise augmentation helps in every condition, including real speech and music it never trained on. |
 | **Uncertainty / open set** | Done for audio and RF. Four states per window. The review band catches most errors; the unseen-drone flag works for audio (AUROC 0.81) and for RF Bebop / Phantom (0.97) but not RF AR (0.45). |
 | **Fusion** | Done (section 7d). Calibrated evidence, summed; audio-only vs RF-only vs fused ablation. RF v2 carries most of the detection; the sum keeps audio's recall for an RF-silent drone and cuts helicopter false alarms. |
 | **Dashboard** | Done. `streamlit run app/dashboard.py`: live-feed replay, states, Grad-CAM, optional RF feed with fused state. |
+| **Outdoor confusers (audio)** | Svanström helicopter/background negatives in training cut window false alarms, with lower recall (`svanstrom_confusers.md`). |
 
 > **Do not claim "99–100% RF detection accuracy".**
 
@@ -27,8 +28,14 @@ All audio combined: **18,093 clips**.
 |---|---|---|
 | **DroneAudioDataset** | Training (indoor) | Parrot Bebop and Mambo. 1,332 drone clips and about 10,370 background clips, 1 s each. The drone clips come from only 312 real recordings, because each 5 s recording was cut into 1 s slices. |
 | **ESC-50 metadata** | Labels | Categories for the background clips, including helicopter, chainsaw, vacuum, washing machine, engine and aeroplane. |
-| **Svanström** | Outdoor test only | 90 10-second recordings: 30 drone, 30 helicopter, 30 background. Cut into 900 1 s windows. Never used for training or tuning. |
+| **Svanström** | Primary tiers: outdoor test; separate confuser experiment | 90 10-second recordings: 30 drone, 30 helicopter, 30 background. Primary tiers keep it test-only. A separate recording-held-out experiment trains on some helicopter/background recordings and reserves all drone recordings plus unseen negative recordings for test. |
 | **ITU ARIS Lab** | Training (outdoor) | 4,491 drone and 1,000 background 1 s clips. No documented helicopters. |
+
+The dashboard's live-audio picker can replay available clips from DroneAudioDataset,
+ITU ARIS and Svanström. Its manifest download contains clip metadata, not waveform
+bytes. PANNs weights were pretrained on AudioSet; raw AudioSet, UrbanSound8K and
+FSD50K corpora are not included in this project. The RF tab lists the local RF
+files and downloads a file inventory; raw RF streams are not replayed in the UI.
 
 ### RF
 
@@ -37,6 +44,36 @@ All audio combined: **18,093 clips**.
 - 227 segments of 0.25 s each: 84 Bebop, 81 AR, 21 Phantom, 41 background
 - Two receivers cover the lower and upper halves of the 2.4 GHz band
 - 23 archives, 4 GB, checksums verified
+- The current RF report uses only this one-session corpus. The separate local
+  `data/RF_datasets` inventory contains 111 files (~73.6 GB); auxiliary folders
+  are not included in the primary RF evaluation. The 20 RAR files in
+  `RF_Dataset1\RF_Dataset1` use the DroneRF archive naming scheme. In
+  `RF_Dataset2\RF_datasets\FR Data_00000_H2`, all 20 extracted CSV member names
+  and byte sizes match the corresponding archive, confirming that this is a
+  duplicate DroneRF copy, not independent data. The separate `IEEE_DATA` folder
+  (46 `.dat` files, prefixes AIR/DIS/INS/MIN) and `datasets_2` (25 `.dat` files,
+  prefixes MA1/MAV) need separate assessments. Windows download-origin metadata
+  for all 25 `datasets_2` files identifies the IEEE DataPort `DroneDetect_V2`
+  source (DOI `10.21227/5jjj-1m32`, also listed in the project RF reference
+  spreadsheet and [official dataset page](https://ieee-dataport.org/open-access/dronedetect-dataset-radio-frequency-dataset-unmanned-aerial-system-uas-signals-machine).
+  The page specifies interleaved-float I/Q, 1.2e8 complex samples per 2-second
+  recording, BladeRF SDR, 28 MHz bandwidth, 2.4375 GHz center frequency, seven
+  drone models, four interference subsets, and three flight modes. All 25 local
+  files are Bluetooth-only (interference code `01`): 15 use the `MA1` prefix
+  (five each for ON, HO, FY), and 10 use `MAV` (five each for HO and FY). The
+  other model prefixes, interference conditions, and `MAV` ON mode are missing.
+  File sizes are divisible by 8 and close to the documented 960 MB per recording.
+  No explicit background class is present, so this subset cannot validate binary
+  drone detection. The new loader decodes the files as complex I/Q and an
+  exploratory five-fold recording-grouped experiment compares MA1 vs MAV on
+  the 20 matched hovering/flying recordings (10 per code). It reports 1.000
+  recording accuracy, balanced accuracy, macro-F1, and ROC-AUC, but this is
+  filename-prefix classification on a small, single-interference subset—not
+  drone detection or evidence of deployment/generalization performance. Five
+  switched-on captures are excluded because MAV has none. The 46 `.dat` files in
+  `IEEE_DATA` have similar sizes, sampled values, and prefixes that resemble
+  DroneDetect's file schema, but their source is not confirmed; do not claim
+  that folder as another independent corpus.
 
 ## 3. Processing
 
@@ -150,7 +187,60 @@ Tier 3 baseline logistic regression: 0.735 / 0.073 / 0 of 600.
 - The pretrained head handles unseen drones better than the baseline, but does not beat it on outdoor PR-AUC.
 - Outdoor training data did not improve PR-AUC (0.640 vs 0.649; the intervals overlap). False alarms did land on target (1.0% vs 3.2%), but recall fell.
 - The model learns ITU ARIS well (validation PR-AUC 0.995). It fails to carry that over to Svanström.
-- **Main weakness:** the pretrained model's drone vs helicopter ROC-AUC is only about 0.58 (baseline about 0.74). Trained on ITU ARIS alone, helicopters score almost like drones (0.90 vs 0.99). Outdoor helicopter and aircraft negatives are the likely next fix.
+- **Main weakness:** the pretrained model's drone vs helicopter ROC-AUC is only about 0.58 (baseline about 0.74). Trained on ITU ARIS alone, helicopters score almost like drones (0.90 vs 0.99).
+
+### Compact architecture comparison
+
+The shared-input experiment in `scripts/compare_audio_architectures.py` trains
+a compact CNN, CNN+GRU, CNN+LSTM and a lightweight transformer on the same
+indoor Tier 1 recording groups and validation threshold. The frozen models are
+evaluated on the indoor holdout and Svanström outdoor set. CNN+GRU leads on
+Tier 1 (PR-AUC 0.985, recall 0.951); the compact CNN leads on Svanström
+(PR-AUC 0.814, recall 0.283). Recurrent and transformer models have lower
+Svanström recall (0.120–0.140). This does not identify a deployment winner:
+the outdoor results are weak and Svanström was previously used in project
+evaluation. The existing AudioCNN and PANNs reports use different feature
+representations and are not directly part of this shared-input ranking. No
+experimental checkpoint replaces the deployed detector. See
+`reports/audio_architecture_comparison.md`.
+
+**Why these architectures:** the deployed audio path keeps the AudioSet-pretrained
+PANNs MobileNetV1 frozen and trains a small logistic head because the corpus has
+many correlated clip slices but relatively few parent recordings; freezing the
+4.2M-parameter encoder limits overfitting and CPU training cost. The compact
+2D-CNN/GRU/LSTM/transformer sweep is a controlled comparison on pooled
+time-frequency features, not a replacement for that pretrained representation.
+Indoor and outdoor leaders differ, and outdoor recall remains weak, so the
+comparison does not justify promoting a new architecture.
+
+### Outdoor confuser training experiment
+
+`scripts/train_svanstrom_confusers.py` compares the same baseline and pretrained
+heads with and without Svanström outdoor helicopter and ambient-background
+negatives. It uses group-disjoint Svanström negative recordings for training,
+validation and test; both variants use the same validation negatives for
+threshold selection, and all Svanström drone recordings remain test-only. The
+test set has 30 drone recordings and six per negative category (71.4% drone
+windows), so its PR-AUC is not a deployment-prevalence estimate. On this
+held-out subset, pretrained PR-AUC increased from 0.867 to 0.948 and ROC-AUC
+from 0.695 to 0.864, while recall decreased from 0.250 to 0.213. Helicopter
+window false alarms changed from 2/60 to 0/60. Only six helicopter and six
+outdoor-background test recordings are included, and this is not an independent
+corpus or blind validation because Svanström was used in earlier project
+evaluation. The integrated audio manifest has no explicitly aircraft-labeled
+outdoor recordings; outdoor aircraft-specific training remains incomplete. The experiment is
+separate and does not replace the tier-4 detector. See
+`reports/svanstrom_confusers.md`.
+
+### Supplemental Tier 1 CNN run
+
+The additional manifest-based `audio_cnn.json` report compares a 2D audio CNN
+with a Random Forest baseline on the same indoor recording-group split. At the
+validation-tuned threshold, the CNN reports 0.989 PR-AUC, 0.998 ROC-AUC, 0.959
+recall and 0.933 drone F1; the Random Forest reports 0.954 PR-AUC, 0.986
+ROC-AUC, 0.886 recall and 0.904 drone F1. These are Tier 1 results and do not
+replace the cross-tier or outdoor results above. The dashboard shows both
+confusion matrices and the complete class reports.
 
 ## 6b. Audio model comparison: CNN vs CNN+GRU vs transformer (`reports/deep_audio.md`)
 
@@ -318,7 +408,7 @@ Evaluation uses synthetic pairs: an outdoor Svanström audio window and an RF wi
 - Tier 4 reused those settings and was not tuned on Svanström, but tier 3 test data had already been seen.
 - The test sets are 12–33% drone, far more than real life. At 1% drone windows, tier 4 precision would fall from 0.917 to about 0.18.
 - `scripts/detect.py` and the dashboard use the tier 4 detector; outdoor recall is still only about 22% of windows.
-- Probabilities are not calibrated (no temperature scaling / ECE); the flags rely on ranks only.
+- Audio probabilities are not calibrated; its uncertainty flags rely on ranks only. RF calibration helpers are implemented but have not been run because the prepared DroneRF feature cache is absent.
 - Noise mixing is additive at fixed SNR: no reverberation, distance or microphone effects.
 - `data/models/rf_forest.joblib` and `rf_detector_dronerf.joblib` (v1) are not usable detectors: they call pure noise "drone". `rf_detector.joblib` is v2.
 - RF v2's only real no-drone recordings are DroneRF's lab background; its noise negatives are synthetic. Its false-alarm rate on real 2.4 GHz traffic elsewhere is unknown, and it misses a band-filling signal like DroneRF's Phantom when that drone is not in training.
@@ -330,8 +420,8 @@ Evaluation uses synthetic pairs: an outdoor Svanström audio window and an RF wi
 
 1. **Deploy the from-scratch CNN** as the audio detector (re-fit the uncertainty flags on it), since it is the best outdoor model.
 2. **Real non-drone RF from other places** (Wi-Fi, Bluetooth), to measure RF v2's real-world false alarms. The Kaggle "Noisy Drone RF" set has a lab-noise class (Bluetooth, Wi-Fi, amplifier) and needs a Kaggle API token; DroneDetect needs an IEEE DataPort subscription; CardRF a University of Louisville login. Add it as negatives in `scripts/train_rf_v2.py`, rerun it and `scripts/eval_fusion.py`.
-4. Add outdoor helicopter and aircraft negatives to audio training.
-5. Optional: probability calibration (ECE) for the audio head.
+3. Outdoor aircraft negatives for audio (helicopter/background done in `svanstrom_confusers.md`).
+4. Optional: probability calibration (ECE) for the audio head (done for RF in `rf_trust.md`).
 
 ## 10. Result files
 
@@ -340,7 +430,14 @@ Evaluation uses synthetic pairs: an outdoor Svanström audio window and an RF wi
 | `reports/baseline_audio.md` | Audio baseline |
 | `reports/pretrained_audio.md` | Pretrained model, tiers 1–3 |
 | `reports/outdoor_audio.md` | Tier 4 |
+| `reports/audio_architecture_comparison.md` | Compact CNN, CNN+GRU, CNN+LSTM and lightweight-transformer comparison |
+| `reports/svanstrom_confusers.md` | Exploratory Svanström helicopter/background negative training comparison |
 | `reports/rf_detection.md` | RF results and warning |
+| `reports/rf_trust.md` | RF calibration and held-out Phantom unknown-signature report (generated after preparing the feature cache) |
+| `reports/dronedetect_subset.md` | Exploratory, recording-held-out DroneDetect prefix classification; not detection |
+| `reports/audio_baseline.json`, `reports/audio_cnn.json` | Supplemental Tier 1 baseline/CNN results and confusion matrices |
+| `reports/audio_noise_robustness.json` | Synthetic white/pink noise test by SNR |
+| `reports/audio_noise_robustness.csv` | Per-condition synthetic-noise metric rows |
 | `reports/noise_robustness.md` | Noise stress test and augmentation |
 | `reports/uncertainty_audio.md` | Uncertainty flags and open set |
 | `reports/deep_audio.md` | CNN vs CNN+GRU vs transformer, from scratch |

@@ -8,8 +8,9 @@
     python scripts/prepare_rf.py --only 00000_L1 00000_H1   # a few archives
 
 Fetches 23 RAR archives (4.0 GB) from Mendeley Data, checks each against its
-published SHA-256, and streams them through bsdtar, so the 45 GB of CSV inside
-never touches the disk. Safe to interrupt and re-run: partial downloads resume.
+published SHA-256, and streams them through bsdtar or 7-Zip, so the 45 GB of
+CSV inside never touches the disk. Safe to interrupt and re-run: partial
+downloads resume.
 
 Writes data/rf_features/{X.npy, index.parquet, config.json}. X is
 (windows, 2, bins) in dB, band 0 = lower half, band 1 = upper half. Row i of X
@@ -271,8 +272,11 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=4, help="parallel downloads")
     args = ap.parse_args()
 
-    if not shutil.which("bsdtar") and not (args.verify or args.download_only):
-        print("bsdtar not found (macOS has it; on Linux: apt install libarchive-tools)")
+    if not any((shutil.which("bsdtar"), shutil.which("7z"),
+                shutil.which("7z.exe"),
+                Path(r"C:\Program Files\7-Zip\7z.exe").is_file())) \
+            and not (args.verify or args.download_only):
+        print("Archive processing requires bsdtar or 7-Zip (7z.exe).")
         return 1
 
     archives = list_archives()
