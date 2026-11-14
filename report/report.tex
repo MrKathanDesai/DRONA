@@ -1,0 +1,534 @@
+% Project report -- compile with pdfLaTeX (e.g. Overleaf: New Project > Upload > Recompile).
+% Self-contained: all diagrams and charts are drawn with TikZ/pgfplots, no image files.
+% Every number is taken from reports/*.json|md and PROJECT_SUMMARY.md in the repository.
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepackage[hidelinks]{hyperref}
+\usepackage{amsmath}
+
+\definecolor{accent}{HTML}{0E7490}
+\definecolor{warn}{HTML}{B45309}
+\definecolor{dronered}{HTML}{D6452A}
+\definecolor{unkviolet}{HTML}{7A4FD6}
+\definecolor{lowamber}{HTML}{D99A0B}
+\definecolor{nogray}{HTML}{8A8984}
+\setlist{itemsep=2pt,topsep=4pt}
+\captionsetup{font=small,labelfont=bf}
+
+\newcommand{\caveat}[1]{\par\smallskip\noindent\fcolorbox{warn}{warn!6}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{\small #1}}\par\smallskip}
+
+\title{\textbf{Counter-Drone Detection from Sound and Radio}\\[4pt]
+\large Acoustic and 2.4\,GHz RF Detection with Uncertainty, Open-Set Flags and Late Fusion}
+\author{Vidhi Rojasara (AU2644022) \quad Kathan Desai (AU2644002)\\[6pt]
+\small AI Lab --- Course Instructor: Prof.\ Maitrik Shah\\
+\small Ahmedabad University, Ahmedabad}
+\date{14 November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Small drones are cheap, quiet and hard to see, which makes them a security problem for
+campuses, prisons and events. We built and evaluated a drone detector that listens for a drone's
+sound and, as a research extension, watches for its 2.4\,GHz radio link. The acoustic detector
+uses a frozen AudioSet-pretrained encoder (PANNs MobileNetV1) with a small trained head and reports
+one of four states per one-second window: \emph{No Drone}, \emph{Known Drone}, \emph{Unknown Drone}
+or \emph{Low Confidence}. We evaluate under strict recording-level leakage control and four tiers
+of increasing difficulty, from held-out indoor recordings to outdoor recordings never seen in
+training. Indoors the detector reaches PR-AUC 0.968; outdoors at a 1\% false-alarm setting it
+catches 22\% of drone windows (66/300) and alarms on 14 of 30 drone recordings and 1 of 30
+helicopter recordings. On RF, a first detector scored near-perfectly on the DroneRF benchmark but,
+when tested on a second receiver, called \emph{pure noise} ``drone'': it had learned the recording
+session, not the drone. A retrained detector (v2) fixes this on all tested noise families and
+catches 9 of 10 drones from another receiver it never trained on. Because no public dataset records
+sound and radio of the same flight, fusion is evaluated on independently paired windows and is
+reported as an upper bound. The project includes a Streamlit dashboard and a live operations
+console. We report what the results show and, equally, what they do not.
+\end{abstract}
+
+\section{Problem statement}
+Detecting a small drone means separating a weak, often distant rotor sound from wind, traffic,
+speech, music and aircraft, and separating a drone's control or video link from ordinary 2.4\,GHz
+traffic such as Wi-Fi and Bluetooth. Published results on public drone datasets are often near
+perfect, but many come from a single recording session: the test windows are slices of the same
+recordings used for training, and the classifier can learn the room, microphone or receiver
+instead of the drone. The problem we address is therefore twofold:
+\begin{enumerate}
+  \item build an acoustic (and an RF) drone detector, and
+  \item measure honestly how well it works \emph{outside} the conditions it was trained on, and say
+        when the system is unsure.
+\end{enumerate}
+
+\section{Objectives}
+\begin{enumerate}
+  \item A leakage-safe data foundation: one manifest for all audio corpora, with splits that never
+        let slices of one recording appear in two splits.
+  \item An acoustic detector, compared against a classical baseline and against CNN, CNN+GRU,
+        CNN+LSTM and transformer models.
+  \item Tiered evaluation: same dataset, unseen drone model, outdoor recordings, and outdoor with
+        outdoor training data.
+  \item Robustness to noise (voice, traffic, wind, music, real speech and music) at fixed SNRs.
+  \item Uncertainty and open-set output: four states per window instead of a bare yes/no.
+  \item An RF detector on 2.4\,GHz recordings, checked on a second receiver.
+  \item Late fusion of audio and RF evidence with an ablation (audio only, RF only, OR, AND,
+        evidence sum, learned layer).
+  \item Explainability (Grad-CAM) and a dashboard that states plainly what is and is not validated.
+\end{enumerate}
+
+\section{Datasets}
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Dataset & Role & Contents \\
+\midrule
+DroneAudioDataset & Audio, indoor training & Parrot Bebop and Mambo; 1,332 drone and about 10,370 background 1\,s clips, from only 312 drone recordings \\
+ESC-50 metadata & Audio labels & Background categories (helicopter, chainsaw, engine, \dots) \\
+ITU ARIS Lab & Audio, outdoor training & 4,491 drone and 1,000 background 1\,s clips \\
+Svanstr\"om et al. & Audio, outdoor test & 90 ten-second recordings: 30 drone, 30 helicopter, 30 background \\
+DroneRF & RF & 227 segments of 0.25\,s (84 Bebop, 81 AR, 21 Phantom, 41 background), one lab session, two receivers covering 2.4\,GHz; 23 archives, checksums verified \\
+Tampere drone RF & RF, second receiver & Anechoic-chamber recordings of 11 drones (Zenodo 4264467) \\
+AeroSonicDB & Audio, outdoor aircraft check & ADS-B-labelled low-flying aircraft and ambience \\
+\bottomrule
+\end{tabularx}
+\caption{Datasets. All audio combined: 18,093 clips.}
+\end{table}
+
+\noindent\textbf{A shortcut found in the raw data.} Before resampling, clip \emph{duration} alone
+separated drone from background with ROC-AUC 1.0. All audio is therefore cut to fixed 1\,s clips at
+16\,kHz mono.
+
+\section{Methodology}
+
+\subsection{System architecture}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm and 7mm,
+  box/.style={draw=accent, rounded corners=3pt, fill=accent!7, align=center,
+              font=\small, minimum height=10mm, text width=26mm},
+  dec/.style={draw=warn, rounded corners=3pt, fill=warn!8, align=center,
+              font=\small, minimum height=10mm, text width=26mm},
+  arr/.style={-Stealth, thick, draw=black!65}]
+  \node[box] (mic) {Microphone audio\\1\,s windows};
+  \node[box, right=of mic] (enc) {Log-mel $\rightarrow$\\PANNs encoder\\(frozen)};
+  \node[box, right=of enc] (head) {Logistic head\\score + flags};
+  \node[box, below=9mm of mic] (rf) {2.4\,GHz RF\\25\,ms windows};
+  \node[box, right=of rf] (psd) {Welch PSD,\\level removed};
+  \node[box, right=of psd] (forest) {RF v2 forest\\score + flags};
+  \node[dec, right=12mm of head, yshift=-9.5mm] (fuse) {Calibrate to\\log-likelihood\\ratio; sum};
+  \node[dec, right=of fuse] (state) {Four states\\+ alarm rule};
+  \draw[arr] (mic) -- (enc); \draw[arr] (enc) -- (head);
+  \draw[arr] (rf) -- (psd); \draw[arr] (psd) -- (forest);
+  \draw[arr] (head) -| (fuse); \draw[arr] (forest) -| (fuse);
+  \draw[arr] (fuse) -- (state);
+\end{tikzpicture}
+\caption{Pipeline. Each sensor keeps its own detector; scores are combined late. In this project
+RF windows come from recorded datasets: there is no live RF receiver.}
+\end{figure}
+
+\subsection{Audio detector}
+\begin{itemize}
+  \item \textbf{Input:} 1\,s clip, RMS-normalised, 64-band log-mel spectrogram.
+  \item \textbf{Encoder:} PANNs MobileNetV1 (4.2\,M parameters) pretrained on AudioSet, \emph{frozen}.
+        The corpus has many near-duplicate slices of few recordings, so training a 4.2\,M-parameter
+        network risks memorising recordings.
+  \item \textbf{Head:} logistic regression on the 1024-dimensional embedding (C\,=\,0.01, balanced
+        classes); in tier 4 the weights balance both dataset and class, so ``sounds outdoors''
+        cannot become a drone cue.
+  \item \textbf{Baseline:} three statistics per mel band (384 features), logistic regression and
+        gradient boosting.
+  \item \textbf{Comparison models} trained from scratch on the same 1\,s log-mel input: CNN (211k
+        parameters), CNN+GRU (270k), AST-style transformer (317k), plus a compact shared-input sweep
+        with CNN+LSTM.
+  \item \textbf{Explainability:} Grad-CAM through the frozen encoder, shown per window.
+\end{itemize}
+
+\subsection{RF detector}
+Each 0.25\,s DroneRF segment is split into ten 25\,ms windows; each becomes a Welch power spectrum
+(2048-point FFT, 1025 bins per band). Each band's mean level is removed so loudness cannot act as a
+shortcut, and classical models average the spectrum into 64 sub-bands per band (128 features).
+Models: logistic regression, random forest (300 trees) and a 1D-CNN ($\approx$12k parameters).
+RF v2 keeps these features and changes only the training data (Section~\ref{sec:rf}).
+
+\subsection{Four output states}
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X@{}}
+\toprule
+\textcolor{nogray}{No Drone} & The available evidence is below the decision threshold. Not proof that no drone is present. \\
+\textcolor{dronered}{Known Drone} & Drone-like evidence above the threshold, without the unknown-signature flag. It means ``resembles the drones in training'', not an identification of the drone model. \\
+\textcolor{unkviolet}{Unknown Drone} & Drone-like evidence above the threshold, but unlike every drone seen in training (distance to known drones). \\
+\textcolor{lowamber}{Low Confidence} & The score is near the threshold (review band) or the input is unlike the training data: a person should review. \\
+\bottomrule
+\end{tabularx}
+\caption{The four states. All cut-offs come from validation data and were fixed before testing.
+Scores are model scores, not calibrated probabilities.}
+\end{table}
+
+\noindent A recording raises an alarm only after consecutive drone windows (two by default), which
+suppresses isolated false hits.
+
+\subsection{Late fusion}
+No dataset records sound and radio of the same flight, so a joint model cannot be trained.
+Each sensor's score is calibrated on its own validation windows (class-balanced Platt scaling)
+into a log-likelihood ratio (LLR), capped at $\pm5$, and the two LLRs are combined:
+\[
+  \text{sum: } f = \mathrm{LLR}_\text{audio} + \mathrm{LLR}_\text{RF},\qquad
+  \text{learned: } f = w_a\,\mathrm{LLR}_\text{audio} + w_r\,\mathrm{LLR}_\text{RF} + b ,
+\]
+with the learned layer a logistic regression fitted on validation pairs ($w_a=1.00$, $w_r=1.60$).
+A missing sensor contributes 0, and each set of available sensors has its own threshold, set for
+1\% false alarms on validation pairs.
+
+\subsection{Evaluation protocol}
+\begin{itemize}
+  \item \textbf{Leakage control:} audio is split by parent recording; RF by time-ordered blocks of
+        three consecutive segments. A validator stops the pipeline on any leak.
+  \item \textbf{Tiers:} (1) held-out recordings, same dataset; (2) a drone model never trained on
+        (audio: train Bebop, test Mambo; RF: each drone left out); (3) train indoor, test outdoor
+        Svanstr\"om; (4) as tier 3 with ITU ARIS outdoor drones added to training.
+  \item \textbf{Threshold} at 1\% false-positive rate on validation data, then frozen for test.
+  \item \textbf{Metrics:} PR-AUC (with 95\% confidence intervals that resample whole recordings),
+        ROC-AUC, recall and false-positive rate at the frozen threshold. Accuracy and F1 are
+        reported beside them but not used as headline metrics: test sets are 12--33\% drone, far
+        more than in practice, so precision-based metrics overstate deployment performance.
+\end{itemize}
+
+\section{Model training details}\label{sec:training}
+All models were trained locally from the project scripts; every run is reproducible from
+\texttt{scripts/} and writes its settings and results to \texttt{reports/}. The audio models share
+one recording-grouped split of the indoor data (DroneAudioDataset + ESC-50 background):
+\begin{center}\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Split & Clips & Drone & Background & Parent recordings \\
+\midrule
+Train & 8,066 & 900 & 7,166 & 1,578 \\
+Validation & 1,632 & 187 & 1,445 & 336 \\
+Test (tier 1) & 2,004 & 245 & 1,759 & 401 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Validation selects checkpoints, thresholds and every review cut-off; test data is used once.
+Tier 2 retrains on Bebop only and tests on Mambo; tier 4 adds ITU ARIS outdoor clips to training.
+
+\begin{table}[h]
+\centering\scriptsize
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2.3cm} >{\raggedright\arraybackslash}p{2.4cm}@{}}
+\toprule
+Model (script) & Input & Architecture / size & Optimisation & Epochs; selection \\
+\midrule
+Classical baseline (\texttt{train\_baseline.py}) & 128-band log-mel; 3 statistics per band (384 features), level removed & Logistic regression (C\,=\,0.1) and HistGradientBoosting (max depth 3) & scikit-learn & ---; threshold at 1\% val.\ FPR \\
+Pretrained head, \textbf{deployed} (\texttt{train\_pretrained.py}, \texttt{train\_outdoor.py}) & 64-band log-mel, RMS-normalised & PANNs MobileNetV1, 4.2\,M params, \emph{frozen} (AudioSet mAP 0.389) + logistic head on 1024-d embedding ($\approx$1,025 weights), C\,=\,0.01, balanced classes; tier 4 balances dataset and class. An MLP head was tried and was no better & scikit-learn; inputs standardised on training data & ---; threshold at 1\% val.\ FPR \\
+Uncertainty layer (\texttt{eval\_uncertainty.py}) & Head logit + embedding & Review band (10\% of val.\ windows nearest threshold), familiarity distance, small head ensemble & fitted on validation & --- \\
+Random-forest audio baseline (\texttt{train\_audio\_baseline.py}) & 64-band log-mel, 64 means + 64 std (128 features) & 300 trees, balanced subsample, seed 42 & --- & ---; threshold by val.\ F1 \\
+AudioCNN (\texttt{train\_audio\_cnn.py}) & 64$\times$101 log-mel & 3 Conv2d-BN-ReLU blocks (16/32/64 ch.), global pooling, dropout 0.3 & AdamW, lr $10^{-3}$, wd $10^{-4}$, batch 128, class-weighted BCE, CPU, seed 42 & max 20, early stop (patience 4): ran 11, best 7 (val PR-AUC 0.952) \\
+CNN / CNN+GRU / Transformer (\texttt{train\_deep.py}) & 128$\times$63 log-mel, level removed, SpecAugment & CNN 4 conv blocks, 211k; CNN+bi-GRU, 270k; AST-style transformer (16$\times$7 patches, 4 layers), 317k & AdamW, lr $2\cdot10^{-3}$, wd $10^{-2}$, batch 128, one-cycle schedule & \textbf{20 fixed}, no early stopping; nothing tuned on test \\
+Compact sweep (\texttt{compare\_audio\_architectures.py}) & Cached log-mel pooled to 64$\times$21, train-only normalisation & Small CNN 23,585; CNN+GRU 56,129; CNN+LSTM 62,401; transformer (2 layers, 4 heads) 72,641 params & early stopping on val.\ PR-AUC & ran / best: 8/8, 8/6, 6/4, 8/7 \\
+\midrule
+RF logistic regression / forest (\texttt{train\_rf.py}) & Welch PSD, 25\,ms, level removed, 64 sub-bands $\times$ 2 bands & LR C\,=\,0.1; forest 300 trees, min.\ 2 per leaf, balanced & --- & ---; threshold at 1\% val.\ FPR \\
+RF 1D-CNN (\texttt{train\_rf.py}) & Same PSD & 4 conv layers (8/16/32/32, kernel 7, stride 2), global pooling, dropout 0.3, $\approx$12k params & Adam, lr $10^{-3}$, wd $10^{-4}$, batch 64 & 40 fixed \\
+RF v2, \textbf{deployed} (\texttt{train\_rf\_v2.py}) & Same 128 features & Same forest; \emph{training data changed} (Section~\ref{sec:rf}) & --- & ---; threshold at 1\% val.\ FPR (0.342) \\
+Fusion (\texttt{eval\_fusion.py}) & Audio + RF scores & Per-sensor Platt calibration to LLR, cap $\pm$5; sum, or logistic layer (weights 1.00 / 1.60) & fitted on validation pairs & --- \\
+\bottomrule
+\end{tabularx}
+\caption{Every trained model: input, size, optimisation and epochs. Sources:
+\texttt{audio\_cnn.json}, \texttt{audio\_baseline.json}, \texttt{deep\_audio.json},
+\texttt{audio\_architecture\_comparison.json}, \texttt{rf\_detection.md}, \texttt{rf\_v2.json},
+\texttt{fusion.json} and the scripts named.}
+\end{table}
+
+\subsection{Which training gave which result}
+\begin{table}[h]
+\centering\scriptsize
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2.6cm}@{}}
+\toprule
+Training change & Effect (test data) & Kept? \\
+\midrule
+Indoor-only head $\rightarrow$ + ITU ARIS outdoor drones (tier 3 $\rightarrow$ 4) & Outdoor PR-AUC 0.649 $\rightarrow$ 0.640 (CIs overlap); recall 0.330 $\rightarrow$ 0.220; false alarms 19/600 $\rightarrow$ 6/600 (on the 1\% target) & Yes (deployed head) \\
+Frozen pretrained head $\rightarrow$ CNN from scratch & Outdoor PR-AUC 0.649 $\rightarrow$ 0.831; drone vs helicopter 0.58 $\rightarrow$ 0.91 & Not yet; next step \\
+Random-forest baseline $\rightarrow$ AudioCNN (tier 1) & PR-AUC 0.954 $\rightarrow$ 0.989; recall 0.886 $\rightarrow$ 0.959; drone F1 0.904 $\rightarrow$ 0.933 & Experiment \\
++ one noisy copy of each training clip & 0\,dB recall up in every condition: real speech 0.269 $\rightarrow$ 0.584, real music 0.449 $\rightarrow$ 0.559; clean 0.878 $\rightarrow$ 0.882 & Experiment \\
++ Svanstr\"om helicopter / background negatives & Held-out subset: PR-AUC 0.867 $\rightarrow$ 0.948; recall 0.250 $\rightarrow$ 0.213; helicopter false alarms 2/60 $\rightarrow$ 0/60 & Experiment (not blind) \\
++ music mixtures & Drone windows caught under equal-loudness music 17\% $\rightarrow$ 45\%; music alone still no alarms & Experiment \\
++ simulated speaker$\rightarrow$microphone playback & Played-back drone windows 45\% $\rightarrow$ 61\%, but lower on clean audio & Opt-in only \\
++ outdoor aircraft negatives & Did not help & No \\
+RF v1 $\rightarrow$ v2 (relabelled silence, noise negatives, second receiver) & Pure noise called drone 1.000 $\rightarrow$ 0.080; unseen Tampere drones 0.954 recall; left-out Phantom 0.976 $\rightarrow$ 0.024 & Yes (deployed RF) \\
+v2 $\rightarrow$ v2b (+ band-level difference) & Did not fix Phantom; noise false alarms up to 0.100 & No \\
+Evidence sum $\rightarrow$ learned fusion layer & Both sensors 0.995 $\rightarrow$ 0.996; RF-silent drone 0.184 $\rightarrow$ 0.002 & No (sum deployed) \\
+\bottomrule
+\end{tabularx}
+\caption{Each training variant, its measured effect and whether it was adopted. Sources:
+\texttt{outdoor\_audio}, \texttt{deep\_audio}, \texttt{audio\_cnn}, \texttt{noise\_robustness},
+\texttt{svanstrom\_confusers}, \texttt{masking}, \texttt{mic\_robustness}, \texttt{aircraft},
+\texttt{rf\_v2} and \texttt{fusion} reports.}
+\end{table}
+
+\section{Experiments and results}
+
+\subsection{Audio across tiers}
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Tier & Baseline (gradient boosting) & Pretrained head & False alarms (pretrained) \\
+\midrule
+1 Held-out recordings & 0.981 / 0.935 & 0.968 / 0.878 & 10 of 1759 \\
+2 Unseen drone (Mambo) & 0.891 / 0.393 & 0.929 / 0.647 & 22 of 2113 \\
+3 Outdoor (Svanstr\"om) & 0.702 / 0.197 & 0.649 / 0.330 & 19 of 600 \\
+4 Outdoor + ITU ARIS training & 0.619 / 0.047 & 0.640 / 0.220 & 6 of 600 \\
+\bottomrule
+\end{tabular}
+\caption{PR-AUC / recall at the frozen threshold. Tier 4 pretrained PR-AUC 95\% CI: 0.503--0.755.
+Source: \texttt{baseline\_audio}, \texttt{pretrained\_audio}, \texttt{outdoor\_audio} reports.}
+\end{table}
+
+\noindent Per recording (tier 4): 14 of 30 drone recordings, 1 of 30 helicopter recordings and 0 of
+30 outdoor-background recordings raise an alarm. \textbf{Indoor scores overstate real performance;
+moving outdoors is the hard step.} The main confusion is helicopters: the pretrained head separates
+drone from helicopter outdoors at ROC-AUC of only about 0.58.
+
+\subsection{Model comparison}
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Tier & CNN & CNN+GRU & Transformer & Pretrained head & Baseline \\
+\midrule
+1 & 0.986 & 0.979 & 0.985 & 0.968 & 0.981 \\
+2 & 0.919 & 0.817 & \textbf{0.926} & \textbf{0.929} & 0.891 \\
+3 & \textbf{0.831} & 0.810 & 0.702 & 0.649 & 0.702 \\
+4 & \textbf{0.796} & 0.791 & 0.673 & 0.640 & 0.619 \\
+\midrule
+Drone vs helicopter ROC-AUC (outdoor) & \textbf{0.911} & 0.898 & 0.799 & $\approx$0.58 & $\approx$0.74 \\
+\bottomrule
+\end{tabular}
+\caption{PR-AUC by tier. Source: \texttt{reports/deep\_audio.md}.}
+\end{table}
+\begin{itemize}
+  \item A small CNN trained from scratch is the best outdoor model (PR-AUC 0.831 vs 0.649) and
+        separates helicopters far better; the frozen encoder did not pay off outdoors.
+  \item The transformer generalises best to an unseen drone (tier-2 recall 0.716) but is weakest
+        outdoors. The GRU adds nothing over the CNN: 1\,s windows leave little temporal structure.
+  \item In the separate shared-input sweep, CNN+GRU leads indoors (PR-AUC 0.985) and the compact
+        CNN outdoors (0.814); recurrent and transformer models have outdoor recall of 0.12--0.14.
+  \item The deployed detector is still the pretrained tier-4 head with uncertainty flags; switching
+        to the CNN is the clearest next step.
+\end{itemize}
+
+\subsection{Noise robustness}
+Tier-1 test clips were mixed with noise from test-split recordings at 20, 10 and 0\,dB SNR, with the
+clean-validation threshold kept fixed. At 20\,dB recall changes by at most 0.016. At 0\,dB:
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  ybar, bar width=6pt, width=\linewidth, height=5.2cm,
+  ymin=0, ymax=1, ylabel={Recall at 0\,dB SNR},
+  symbolic x coords={Clean,Voice,Traffic,Wind,Environment,Mixed,Real speech,Real music},
+  xtick=data, x tick label style={rotate=25, anchor=east, font=\footnotesize},
+  legend style={at={(0.5,1.03)}, anchor=south, legend columns=3, font=\footnotesize, draw=none},
+  ymajorgrids, grid style={black!10}, enlarge x limits=0.07]
+\addplot[fill=accent!70, draw=none] coordinates {(Clean,0.878) (Voice,0.396) (Traffic,0.502) (Wind,0.743) (Environment,0.412) (Mixed,0.478) (Real speech,0.269) (Real music,0.449)};
+\addplot[fill=warn!70, draw=none] coordinates {(Clean,0.882) (Voice,0.498) (Traffic,0.547) (Wind,0.796) (Environment,0.506) (Mixed,0.596) (Real speech,0.584) (Real music,0.559)};
+\addplot[fill=black!35, draw=none] coordinates {(Clean,0.833) (Voice,0.698) (Traffic,0.469) (Wind,0.657) (Environment,0.527) (Mixed,0.392) (Real speech,0.661) (Real music,0.510)};
+\legend{Pretrained, Pretrained + noise augmentation, Baseline}
+\end{axis}
+\end{tikzpicture}
+\caption{Recall at 0\,dB SNR, threshold fixed at its clean value. Source: \texttt{reports/noise\_robustness.md}.}
+\end{figure}
+\noindent Noise augmentation (one noisy copy of each training clip) raises 0\,dB recall in every
+condition, including real speech (+0.31) and real music (+0.11) that it never trained on. Loud music
+is the only noise that causes many false alarms (7--9\% at 0\,dB against a 1\% target). Under
+equal-loudness real music the detector catches 17\% of drone windows; a detector trained with music
+mixtures catches 45\% while music alone still raises no alarms (an experiment, not deployed;
+\texttt{masking.md}).
+
+\subsection{Uncertainty and open set}
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Tier & Error rate & Flagged Low Confidence & Error rate on the rest & Share of errors flagged \\
+\midrule
+1 & 0.020 & 12.7\% & 0.005 & 80\% \\
+3 & 0.244 & 41.8\% & 0.218 & 48\% \\
+4 & 0.267 & 11.6\% & 0.245 & 19\% \\
+\bottomrule
+\end{tabular}
+\caption{Review flags. Source: \texttt{reports/uncertainty\_audio.md}.}
+\end{table}
+\noindent Trained on Bebop only, the distance to known drones separates the unseen Mambo from
+held-out Bebop at AUROC 0.81. The review flag catches most errors indoors but only 19\% outdoors,
+and only 1.7\% of outdoor windows are flagged ``unlike training data'': the flags do not detect the
+move outdoors.
+
+\subsection{RF: a shortcut, and the fix}\label{sec:rf}
+\textbf{v1} (trained on DroneRF only) scored PR-AUC 1.000 for the forest on held-out time and on each
+left-out drone. Two checks showed the score was not about drones:
+\begin{enumerate}
+  \item On windows with \emph{no visible transmission}, the forest still separated drone from
+        background sessions at AUC 1.000.
+  \item On a second receiver (Tampere), it called \textbf{100\% of pure white-noise windows ``drone''}
+        (median score 0.88). Its rule was ``not the DroneRF background recording''.
+\end{enumerate}
+\textbf{v2} keeps the features and forest and changes only the training data, fixed before any v2
+result was seen: noise-floor windows from drone sessions are no longer labelled drone; white and
+coloured receiver noise through both receiver pipelines are added as negatives (pink noise held
+out); Tampere drones from a second receiver are added as positives, split by drone.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Check & v1 & v2 (deployed) \\
+\midrule
+Pure noise called ``drone'' (worst family, incl.\ held-out pink) & 1.000 & \textbf{0.080} \\
+White-noise control from the Tampere check & 1.000 & \textbf{0.000} \\
+DroneRF noise-floor windows from drone sessions called ``drone'' & all & \textbf{0.000} \\
+Tampere drones never trained on, mean recall (leave one out) & n/a & \textbf{0.954} \\
+Test set: drone windows caught / false alarms & --- & 289/291 / 4/390 \\
+Left-out DroneRF Phantom recall & 0.976 & 0.024 \\
+\bottomrule
+\end{tabular}
+\caption{RF v1 vs v2. Source: \texttt{reports/rf\_tampere.md}, \texttt{reports/rf\_v2.md}.}
+\end{table}
+\noindent v2 detects transmissions rather than the session: 9 of 10 unseen Tampere drones are caught
+at recall 1.000 (Parrot Mambo 0.542). It misses a left-out Phantom, whose video link fills the band
+almost flat and, with level removed, resembles a raised noise floor (v1's 0.976 there was the
+shortcut). RF calibration on DroneRF (temperature scaling) lowers test ECE from 0.0166 to 0.0069,
+within one session (\texttt{rf\_trust.md}).
+
+\caveat{\textbf{RF limits.} v2's only real no-drone recordings are DroneRF's lab background; its
+noise negatives are synthetic. False alarms on real Wi-Fi/Bluetooth traffic are unmeasured, and
+there is no live RF receiver in this project.}
+
+\subsection{Fusion ablation}
+Pairs combine an outdoor Svanstr\"om audio window with an RF window of the same class drawn
+independently; 4,000 pairs per class and scenario.
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Method & Both sensors & RF-silent drone & RF sees only receiver noise \\
+\midrule
+Audio only & 0.225 / 0.007 & 0.223 / 0.012 & 0.224 / 0.010 \\
+RF only & 0.993 / 0.000 & 0.000 / 0.000 & 0.993 / 0.013 \\
+OR & 0.995 / 0.007 & 0.223 / 0.012 & 0.993 / 0.023 \\
+AND & 0.224 / 0.000 & 0.000 / 0.000 & 0.224 / 0.000 \\
+\textbf{Evidence sum (deployed)} & \textbf{0.995 / 0.005} & \textbf{0.184 / 0.008} & 0.992 / 0.028 \\
+Learned layer & 0.996 / 0.000 & 0.002 / 0.000 & 0.995 / 0.022 \\
+\bottomrule
+\end{tabular}
+\caption{Recall / false-positive rate. Source: \texttt{reports/fusion.md}.}
+\end{table}
+\begin{itemize}
+  \item With both sensors, fusion matches RF alone: RF v2 is near perfect on these test windows,
+        which come from one lab, so this is RF's best case.
+  \item For an \textbf{RF-silent (autonomous) drone}, the sum keeps most of audio's recall
+        (0.184 vs 0.223); the learned layer collapses to 0.002, because it was fitted on pairs that
+        never contain a drone without a radio link. The evidence sum is therefore the deployed rule.
+        This choice was made after seeing these test results, and we report it as such.
+  \item Helicopter false alarms fall from 0.014 (audio only) to 0.011 (sum) and 0 (AND).
+\end{itemize}
+\caveat{\textbf{Fusion is an upper bound.} Pairs are independently sampled, not synchronized
+recordings of the same flight, which is exactly the independence the sum rule assumes.}
+
+\subsection{Outdoor checks and alarm rule}
+\begin{itemize}
+  \item \textbf{Real aircraft (AeroSonicDB, held-out sessions):} no alarm on any of 99 low-flying
+        aircraft or 317 outdoor-ambience recordings, partly because the detector is conservative
+        outdoors (\texttt{aircraft.md}).
+  \item \textbf{Live alarm rule}, calibrated on validation recordings: alarms on 57\% of outdoor
+        test drone recordings for 1.7\% of background recordings (\texttt{live\_calibration.md}).
+\end{itemize}
+
+\section{Implementation}
+\begin{itemize}
+  \item \textbf{Code:} Python package \texttt{src/dronedet} (data, features, models, evaluation,
+        fusion), 30+ scripts that regenerate every report, and 182 automated tests (leakage, splits,
+        features, models, four-state logic, dashboard rendering).
+  \item \textbf{Dashboard} (\texttt{streamlit run app/dashboard.py}): a project briefing that reads
+        model/data readiness from the files on disk; a replay page that shows the recording-level
+        result first, separate audio and RF evidence, Grad-CAM and the reasons for each state; the
+        full fusion ablation; System/Light/Dark themes.
+  \item \textbf{Operations console} (\texttt{python -m console}): microphone or file input, incident
+        queue, operator labels and a champion/challenger retraining gate with rollback.
+\end{itemize}
+
+\section{Discussion: what the results show and do not show}
+\begin{minipage}[t]{0.48\linewidth}
+\textbf{They show}
+\begin{itemize}
+  \item The audio detector works on held-out indoor recordings and on an unseen drone model.
+  \item Outdoors, it catches about a fifth of drone windows at a 1\% false-alarm setting.
+  \item A near-perfect RF benchmark score was a session shortcut; RF v2 removes it on the tested
+        noise families and on a second receiver.
+  \item For RF-silent drones only audio helps; the evidence sum keeps it, the learned layer does not.
+\end{itemize}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\textbf{They do not show}
+\begin{itemize}
+  \item Field performance at a deployment site.
+  \item Synchronized audio+RF performance (no co-recorded data exists).
+  \item RF false alarms on real Wi-Fi/Bluetooth traffic.
+  \item Calibrated audio probabilities, or drone-model identification inside the four states.
+\end{itemize}
+\end{minipage}
+
+\subsection*{Limitations}
+\begin{itemize}
+  \item Some pretrained-head settings were chosen from a small grid while looking at all tiers,
+        including tier 3; those rows are mildly optimistic.
+  \item Test sets are 12--33\% drone. At 1\% drone windows, tier-4 precision would fall from 0.917
+        to about 0.18.
+  \item Noise is mixed additively at fixed SNR: no reverberation, distance or microphone effects.
+  \item The deployed fusion rule was switched from the planned learned layer after seeing test results.
+\end{itemize}
+
+\section{Conclusion and future work}
+We built an end-to-end acoustic drone detector with honest, leakage-controlled evaluation,
+four-state uncertainty output, an RF extension whose first version we showed to be a shortcut and
+then fixed, and an audio+RF fusion ablation. The strongest result is a negative one worth
+reporting: benchmark scores near 1.0 did not survive a second receiver or the move outdoors.
+Next steps, in order:
+\begin{enumerate}
+  \item Deploy the from-scratch CNN as the audio detector and re-fit the uncertainty flags on it.
+  \item Record real Wi-Fi/Bluetooth RF negatives outside the DroneRF lab to measure RF false alarms.
+  \item Record synchronized audio and RF of the same flights to validate fusion.
+  \item Integrate an RF receiver (SDR) and collect field recordings at the intended site.
+\end{enumerate}
+
+\section*{References}
+\begin{enumerate}[label={[\arabic*]},leftmargin=*,itemsep=1pt]\small
+  \item M.~S. Allahham, M.~F. Al-Sa'd, A.~Al-Ali, A.~Mohamed, T.~Khattab, A.~Erbad. ``DroneRF dataset: A dataset of drones for RF-based detection, classification and identification.'' \emph{Data in Brief}, 2019.
+  \item Q.~Kong, Y.~Cao, T.~Iqbal, Y.~Wang, W.~Wang, M.~D. Plumbley. ``PANNs: Large-scale pretrained audio neural networks for audio pattern recognition.'' \emph{IEEE/ACM TASLP}, 2020.
+  \item S.~Al-Emadi, A.~Al-Ali, A.~Mohammad, A.~Al-Ali. ``Audio based drone detection and identification using deep learning.'' \emph{IWCMC}, 2019 (DroneAudioDataset).
+  \item F.~Svanstr\"om, F.~Alonso-Fernandez, C.~Englund. ``A dataset for multi-sensor drone detection.'' \emph{Data in Brief}, 2021.
+  \item K.~J. Piczak. ``ESC: Dataset for environmental sound classification.'' \emph{ACM Multimedia}, 2015.
+  \item Tampere University drone RF recordings, Zenodo record 4264467 (CC BY 4.0).
+  \item ITU ARIS Lab drone audio dataset, Zenodo record 22682339.
+  \item AeroSonicDB (YPAD-0523): acoustic aircraft detection dataset.
+  \item J.~Platt. ``Probabilistic outputs for support vector machines and comparisons to regularized likelihood methods.'' 1999.
+  \item C.~Guo, G.~Pleiss, Y.~Sun, K.~Q. Weinberger. ``On calibration of modern neural networks.'' \emph{ICML}, 2017.
+  \item R.~R. Selvaraju et al. ``Grad-CAM: Visual explanations from deep networks via gradient-based localization.'' \emph{ICCV}, 2017.
+\end{enumerate}
+
+\end{document}

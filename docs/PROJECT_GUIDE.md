@@ -907,10 +907,10 @@ silently broken.
 | RF cross-dataset test | ✅ Tampere recordings: RF v1 calls pure noise "drone", `reports/rf_tampere.md` |
 | RF detector that detects transmissions | ✅ RF v2, `reports/rf_v2.md`: noise "no drone", 9/10 unseen Tampere drones caught; real-world Wi-Fi / Bluetooth false alarms unmeasured |
 | Uncertainty flag ("low confidence") | ✅ Review band + familiarity, `reports/uncertainty_audio.md` |
-| Probability calibration (temperature scaling, ECE) | ❌ Not done; the flags use ranks, not calibrated probabilities |
+| Probability calibration (temperature scaling, ECE) | ◐ RF only: temperature scaling on DroneRF, single session (`reports/rf_trust.md`). Audio scores are not calibrated; its flags use ranks |
 | Open-set "Unknown drone" | ✅ Train Bebop, Mambo flagged at AUROC 0.81 |
-| Streamlit dashboard + explainability overlay | ✅ `app/dashboard.py`, Grad-CAM |
-| Fusion with RF + ablation | ✅ Calibrated sum + learned layer on RF v2, `reports/fusion.md` |
+| Streamlit dashboard + explainability overlay | ✅ `app/dashboard.py`, Grad-CAM; briefing page, recording-level result, System / Light / Dark theme. Offline replay only |
+| Fusion with RF + ablation | ◐ Calibrated sum (deployed) + learned layer (not deployed: misses RF-silent drones) on RF v2, `reports/fusion.md`; unpaired synthetic pairs, an upper bound. Models rebuilt and verified 14 Nov 2026; dashboard shows Audio + RF = Final |
 
 **What was added after this guide was first written (Nov 2026):**
 

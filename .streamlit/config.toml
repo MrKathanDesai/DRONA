@@ -1,0 +1,28 @@
+# Dashboard theme (streamlit run app/dashboard.py).
+#
+# Two palettes, so Streamlit's own theme setting offers System / Light / Dark.
+# "System" follows the browser / OS prefers-color-scheme. The dashboard opens
+# in Dark (dronedet.status.DEFAULT_THEME); its sidebar "Theme" control and the
+# ⋮ menu -> Settings both change the same setting. Every native widget, table, chart and the sidebar follow it; the
+# dashboard's own CSS is colour-neutral (it mixes with the current text
+# colour), so it reads in both palettes.
+#
+# Contrast (WCAG): light text #0f172a on #ffffff is 17.9:1; dark text #e5edf7
+# on #0b1220 is 15.9:1; primary #0e7490 on white is 5.4:1 (4.9:1 on the
+# secondary background), #38bdf8 on #0b1220 is 8.7:1.
+
+[theme.light]
+base = "light"
+primaryColor = "#0e7490"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f1f5f9"
+textColor = "#0f172a"
+linkColor = "#0e7490"
+
+[theme.dark]
+base = "dark"
+primaryColor = "#38bdf8"
+backgroundColor = "#0b1220"
+secondaryBackgroundColor = "#152033"
+textColor = "#e5edf7"
+linkColor = "#7dd3fc"

@@ -16,20 +16,24 @@ Level alone, AUC: low band 0.908, high band 0.504.
 |---|---|---|---|---|---|
 | logreg | tier 1 | 0.998 [0.989, 1.000] | 0.985 | 0.985 | 0.0000 (0/50) |
 | forest | tier 1 | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 0.0200 (1/50) |
-| cnn | tier 1 | 1.000 [1.000, 1.000] | 1.000 | 0.978 | 0.0000 (0/50) |
+| cnn | tier 1 | 1.000 [1.000, 1.000] | 1.000 | 0.993 | 0.0000 (0/50) |
 | forest+level | tier 1 | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 0.0000 (0/50) |
+| forest+tilt | tier 1 | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 0.0200 (1/50) |
 | logreg | tier 2, unseen bebop | 0.999 [0.998, 1.000] | 0.992 | 0.977 | 0.0000 (0/80) |
 | forest | tier 2, unseen bebop | 1.000 [1.000, 1.000] | 1.000 | 0.988 | 0.0000 (0/80) |
-| cnn | tier 2, unseen bebop | 1.000 [0.999, 1.000] | 0.997 | 0.926 | 0.0000 (0/80) |
+| cnn | tier 2, unseen bebop | 1.000 [0.999, 1.000] | 0.997 | 0.885 | 0.0000 (0/80) |
 | forest+level | tier 2, unseen bebop | 1.000 [1.000, 1.000] | 1.000 | 0.988 | 0.0000 (0/80) |
+| forest+tilt | tier 2, unseen bebop | 1.000 [1.000, 1.000] | 1.000 | 0.988 | 0.0000 (0/80) |
 | logreg | tier 2, unseen ar | 1.000 [1.000, 1.000] | 1.000 | 0.994 | 0.0000 (0/80) |
 | forest | tier 2, unseen ar | 1.000 [1.000, 1.000] | 1.000 | 0.991 | 0.0000 (0/80) |
-| cnn | tier 2, unseen ar | 1.000 [1.000, 1.000] | 1.000 | 0.967 | 0.0000 (0/80) |
+| cnn | tier 2, unseen ar | 1.000 [1.000, 1.000] | 1.000 | 0.957 | 0.0000 (0/80) |
 | forest+level | tier 2, unseen ar | 1.000 [1.000, 1.000] | 1.000 | 0.963 | 0.0000 (0/80) |
+| forest+tilt | tier 2, unseen ar | 1.000 [1.000, 1.000] | 1.000 | 0.993 | 0.0000 (0/80) |
 | logreg | tier 2, unseen phantom | 0.580 [0.326, 0.853] | 0.076 | 0.076 | 0.0000 (0/80) |
 | forest | tier 2, unseen phantom | 1.000 [1.000, 1.000] | 1.000 | 0.976 | 0.0000 (0/80) |
-| cnn | tier 2, unseen phantom | 1.000 [1.000, 1.000] | 1.000 | 0.990 | 0.0000 (0/80) |
+| cnn | tier 2, unseen phantom | 1.000 [1.000, 1.000] | 1.000 | 1.000 | 0.0000 (0/80) |
 | forest+level | tier 2, unseen phantom | 1.000 [1.000, 1.000] | 1.000 | 0.952 | 0.0000 (0/80) |
+| forest+tilt | tier 2, unseen phantom | 1.000 [1.000, 1.000] | 1.000 | 0.976 | 0.0000 (0/80) |
 
 ## Per 0.25 s segment, tier 1 test (forest, 2 consecutive windows)
 
@@ -43,7 +47,7 @@ Level alone, AUC: low band 0.908, high band 0.504.
 | | background | bebop | ar | phantom |
 |---|---|---|---|---|
 | background | 50 | 0 | 0 | 0 |
-| bebop | 2 | 100 | 17 | 1 |
+| bebop | 2 | 99 | 18 | 1 |
 | ar | 3 | 4 | 113 | 0 |
 | phantom | 0 | 0 | 1 | 29 |
 

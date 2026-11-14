@@ -114,19 +114,38 @@ class RFFeed:
             if not p.exists():
                 raise FileNotFoundError(f"{p} missing; run scripts/prepare_rf.py, "
                                         "eval_rf_tampere.py and train_rf_v2.py")
+        # fusion_models.joblib (eval_fusion.py since f5b8c22) holds every rule
+        # and names the deployed one; older runs saved only the deployed rule
+        # (the evidence sum) as fusion.joblib, which still works on its own.
         if FUSION_MODELS.exists():
             saved_fusions = joblib.load(FUSION_MODELS)
-            self.fusions = saved_fusions["methods"]
+            if not isinstance(saved_fusions, dict) or "methods" not in saved_fusions:
+                raise ValueError(f"{FUSION_MODELS} has an unexpected format; "
+                                 "re-run scripts/eval_fusion.py")
+            self.fusions = dict(saved_fusions["methods"])
+            self.deployed = saved_fusions.get("deployed", "sum")
+            fusion_path = FUSION_MODELS
         elif FUSION.exists():
             self.fusions = {"sum": joblib.load(FUSION)}
+            self.deployed = "sum"
+            fusion_path = FUSION
         else:
             raise FileNotFoundError(
                 f"{FUSION_MODELS} missing; run scripts/eval_fusion.py"
             )
         if not self.fusions:
             raise ValueError(f"No fusion models found in {FUSION_MODELS}")
+        if self.deployed not in self.fusions:
+            self.deployed = next(iter(self.fusions))
         self.det = joblib.load(RF_DETECTOR)
-        self.fusion = self.fusions.get("sum", next(iter(self.fusions.values())))
+        self.fusion = self.fusions[self.deployed]
+        # Fusion calibrates the RF detector's scores; a detector retrained
+        # after the fusion run makes that calibration stale.
+        self.warnings: list[str] = []
+        if fusion_path.stat().st_mtime < RF_DETECTOR.stat().st_mtime:
+            self.warnings.append(
+                "The fusion rules are older than the RF detector they calibrate; "
+                "re-run scripts/eval_fusion.py so the evidence scale matches.")
         self.features = M.MODELS[self.det.info.get("features", M.DEPLOY)][0]
         X = np.load(RF_V2 / "X.npy")
         df = pd.read_parquet(RF_V2 / "index.parquet")

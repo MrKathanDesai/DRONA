@@ -9,9 +9,9 @@
 | validation raw | 0.0188 | 0.0108 | 0.0267 | 330 |
 | validation temperature scaled | 0.0028 | 0.0055 | 0.0099 | 330 |
 | test raw | 0.0166 | 0.0111 | 0.0261 | 320 |
-| test temperature scaled | 0.0068 | 0.0054 | 0.0089 | 320 |
+| test temperature scaled | 0.0069 | 0.0054 | 0.0089 | 320 |
 
-Validation-frozen temperature: 0.3030. Threshold selected for validation FPR 1%: 0.0316.
+Validation-frozen temperature: 0.3029. Threshold selected for validation FPR 1%: 0.0315.
 
 ## Held-out Phantom unknown-signature probe
 
@@ -19,7 +19,7 @@ Known training classes are background, Bebop and AR. Phantom is excluded from mo
 
 | Unknown ROC-AUC | Known acceptance | Phantom rejection | Known test | Phantom test |
 |---:|---:|---:|---:|---:|
-| 0.771 | 0.042 | 1.000 | 240 | 30 |
+| 0.769 | 0.042 | 1.000 | 240 | 30 |
 
 ## Limitations
 
