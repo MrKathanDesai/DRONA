@@ -1,0 +1,467 @@
+{
+  "target_fpr": 0.01,
+  "smoothing": "3 of 5",
+  "emitters": {
+    "train": {
+      "per_family_pipeline": 60,
+      "families": [
+        "wifi",
+        "microwave"
+      ]
+    },
+    "val": {
+      "per_family_pipeline": 20,
+      "families": [
+        "wifi",
+        "microwave"
+      ]
+    },
+    "test": {
+      "per_family_pipeline": 30,
+      "families": [
+        "wifi",
+        "bluetooth",
+        "microwave"
+      ]
+    }
+  },
+  "models": {
+    "v2 forest": {
+      "recall": 0.993127147766323,
+      "fpr": 0.10526315789473684,
+      "false_alarms": 60,
+      "negatives": 570,
+      "pr_auc": 0.9940592928831059,
+      "recall_smoothed": 0.9312714776632303,
+      "fpr_smoothed": 0.06666666666666667,
+      "threshold": 0.34550000000000003,
+      "by_category": [
+        {
+          "source": "dronerf",
+          "category": "drone",
+          "windows": 251,
+          "called_drone": 0.9920318725099602,
+          "called_drone_smoothed": 0.9282868525896414
+        },
+        {
+          "source": "dronerf",
+          "category": "rf_background",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_bluetooth",
+          "windows": 30,
+          "called_drone": 0.06666666666666667,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_microwave",
+          "windows": 30,
+          "called_drone": 0.13333333333333333,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_wifi",
+          "windows": 30,
+          "called_drone": 0.5333333333333333,
+          "called_drone_smoothed": 0.4
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_bluetooth",
+          "windows": 30,
+          "called_drone": 0.16666666666666666,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_microwave",
+          "windows": 30,
+          "called_drone": 0.3333333333333333,
+          "called_drone_smoothed": 0.13333333333333333
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_wifi",
+          "windows": 30,
+          "called_drone": 0.6333333333333333,
+          "called_drone_smoothed": 0.7333333333333333
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_coloured",
+          "windows": 50,
+          "called_drone": 0.08,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_pink",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_white",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_coloured",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_control",
+          "windows": 40,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_pink",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_white",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "tampere",
+          "category": "drone",
+          "windows": 40,
+          "called_drone": 1.0,
+          "called_drone_smoothed": 0.95
+        }
+      ]
+    },
+    "v3 forest": {
+      "recall": 0.9965635738831615,
+      "fpr": 0.02982456140350877,
+      "false_alarms": 17,
+      "negatives": 570,
+      "pr_auc": 0.9994401882602618,
+      "recall_smoothed": 0.9312714776632303,
+      "fpr_smoothed": 0.0017543859649122807,
+      "threshold": 0.28250000000000003,
+      "by_category": [
+        {
+          "source": "dronerf",
+          "category": "drone",
+          "windows": 251,
+          "called_drone": 0.9960159362549801,
+          "called_drone_smoothed": 0.9282868525896414
+        },
+        {
+          "source": "dronerf",
+          "category": "rf_background",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_bluetooth",
+          "windows": 30,
+          "called_drone": 0.1,
+          "called_drone_smoothed": 0.03333333333333333
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_microwave",
+          "windows": 30,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_wifi",
+          "windows": 30,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_bluetooth",
+          "windows": 30,
+          "called_drone": 0.2,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_microwave",
+          "windows": 30,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_wifi",
+          "windows": 30,
+          "called_drone": 0.03333333333333333,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_coloured",
+          "windows": 50,
+          "called_drone": 0.14,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_pink",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_white",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_coloured",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_control",
+          "windows": 40,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_pink",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_white",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "tampere",
+          "category": "drone",
+          "windows": 40,
+          "called_drone": 1.0,
+          "called_drone_smoothed": 0.95
+        }
+      ]
+    },
+    "v3 1D-CNN": {
+      "recall": 1.0,
+      "fpr": 0.2,
+      "false_alarms": 114,
+      "negatives": 570,
+      "pr_auc": 0.7045142655141639,
+      "recall_smoothed": 0.9312714776632303,
+      "fpr_smoothed": 0.09824561403508772,
+      "threshold": 0.035082798451185226,
+      "by_category": [
+        {
+          "source": "dronerf",
+          "category": "drone",
+          "windows": 251,
+          "called_drone": 1.0,
+          "called_drone_smoothed": 0.9282868525896414
+        },
+        {
+          "source": "dronerf",
+          "category": "rf_background",
+          "windows": 50,
+          "called_drone": 0.04,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_bluetooth",
+          "windows": 30,
+          "called_drone": 1.0,
+          "called_drone_smoothed": 0.9333333333333333
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_microwave",
+          "windows": 30,
+          "called_drone": 0.03333333333333333,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_dronerf",
+          "category": "emitter_wifi",
+          "windows": 30,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_bluetooth",
+          "windows": 30,
+          "called_drone": 1.0,
+          "called_drone_smoothed": 0.9333333333333333
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_microwave",
+          "windows": 30,
+          "called_drone": 0.03333333333333333,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "emitter_tampere",
+          "category": "emitter_wifi",
+          "windows": 30,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_coloured",
+          "windows": 50,
+          "called_drone": 0.08,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_pink",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_dronerf",
+          "category": "noise_white",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_coloured",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_control",
+          "windows": 40,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_pink",
+          "windows": 50,
+          "called_drone": 0.92,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "noise_tampere",
+          "category": "noise_white",
+          "windows": 50,
+          "called_drone": 0.0,
+          "called_drone_smoothed": 0.0
+        },
+        {
+          "source": "tampere",
+          "category": "drone",
+          "windows": 40,
+          "called_drone": 1.0,
+          "called_drone_smoothed": 0.95
+        }
+      ]
+    }
+  },
+  "time_frequency": {
+    "PSD only": {
+      "lodo_recall_mean": 1.0,
+      "lodo_recall": {
+        "DJI_inspire_2": 1.0,
+        "DJI_matrice_100": 1.0,
+        "DJI_matrice_210": 1.0,
+        "DJI_mavic_mini": 1.0,
+        "DJI_mavic_pro": 1.0,
+        "DJI_phantom_4": 1.0,
+        "DJI_phantom_4_pro_plus": 1.0,
+        "Parrot_disco": 1.0,
+        "Parrot_mambo": 1.0,
+        "Yuneec_typhoon_h": 1.0
+      },
+      "false_alarm_rate": {
+        "noise": 0.0,
+        "wifi": 0.28,
+        "microwave": 0.008,
+        "bluetooth": 1.0
+      }
+    },
+    "PSD + time-frequency": {
+      "lodo_recall_mean": 0.9962500000000001,
+      "lodo_recall": {
+        "DJI_inspire_2": 1.0,
+        "DJI_matrice_100": 1.0,
+        "DJI_matrice_210": 1.0,
+        "DJI_mavic_mini": 1.0,
+        "DJI_mavic_pro": 1.0,
+        "DJI_phantom_4": 1.0,
+        "DJI_phantom_4_pro_plus": 1.0,
+        "Parrot_disco": 1.0,
+        "Parrot_mambo": 0.9625,
+        "Yuneec_typhoon_h": 1.0
+      },
+      "false_alarm_rate": {
+        "noise": 0.0,
+        "wifi": 0.25600000000000006,
+        "microwave": 0.024,
+        "bluetooth": 1.0
+      }
+    },
+    "time-frequency only": {
+      "lodo_recall_mean": 0.9275,
+      "lodo_recall": {
+        "DJI_inspire_2": 1.0,
+        "DJI_matrice_100": 0.75,
+        "DJI_matrice_210": 1.0,
+        "DJI_mavic_mini": 0.975,
+        "DJI_mavic_pro": 1.0,
+        "DJI_phantom_4": 1.0,
+        "DJI_phantom_4_pro_plus": 1.0,
+        "Parrot_disco": 0.95,
+        "Parrot_mambo": 0.875,
+        "Yuneec_typhoon_h": 0.725
+      },
+      "false_alarm_rate": {
+        "noise": 0.0,
+        "wifi": 0.004,
+        "microwave": 0.0,
+        "bluetooth": 1.0
+      }
+    }
+  }
+}

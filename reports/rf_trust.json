@@ -1,0 +1,345 @@
+{
+  "title": "DroneRF calibration and unknown-signature experiment",
+  "source": "DroneRF; single lab session",
+  "feature": "Two-band, level-invariant 64-band summary of each 25 ms Welch PSD.",
+  "split": "Chronological, recording-grouped Tier 1 train/validation/test. Phantom is excluded from open-set training and validation and is evaluated only as the held-out unknown drone model.",
+  "binary_target_fpr": 0.01,
+  "binary_calibration": {
+    "temperature": 0.3029872280111947,
+    "threshold_at_validation_fpr": 0.03157879640900481,
+    "raw_threshold_at_validation_fpr": 0.2616944444444446,
+    "validation": {
+      "raw": {
+        "ece": 0.018834162330374386,
+        "brier_score": 0.01083606232175755,
+        "nll": 0.026718197811721994,
+        "sample_count": 330,
+        "bins": [
+          {
+            "lower": 0.6000000000000001,
+            "upper": 0.7000000000000001,
+            "count": 6,
+            "accuracy": 0.8333333333333334,
+            "mean_confidence": 0.6550257936507937
+          },
+          {
+            "lower": 0.7000000000000001,
+            "upper": 0.8,
+            "count": 8,
+            "accuracy": 1.0,
+            "mean_confidence": 0.746297153078403
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 4,
+            "accuracy": 1.0,
+            "mean_confidence": 0.8472678571428571
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 312,
+            "accuracy": 1.0,
+            "mean_confidence": 0.9919715481277982
+          }
+        ]
+      },
+      "temperature_scaled": {
+        "ece": 0.002816459440708798,
+        "brier_score": 0.0055055805109314295,
+        "nll": 0.009945548665208023,
+        "sample_count": 330,
+        "bins": [
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 3,
+            "accuracy": 1.0,
+            "mean_confidence": 0.8553855252575217
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 327,
+            "accuracy": 0.9969418960244648,
+            "mean_confidence": 0.9984574562422216
+          }
+        ]
+      }
+    },
+    "test": {
+      "raw": {
+        "ece": 0.016631878682659817,
+        "brier_score": 0.011102331971199317,
+        "nll": 0.026086916660588027,
+        "sample_count": 320,
+        "bins": [
+          {
+            "lower": 0.5,
+            "upper": 0.6000000000000001,
+            "count": 4,
+            "accuracy": 0.5,
+            "mean_confidence": 0.530205357142857
+          },
+          {
+            "lower": 0.6000000000000001,
+            "upper": 0.7000000000000001,
+            "count": 3,
+            "accuracy": 1.0,
+            "mean_confidence": 0.6656650633317301
+          },
+          {
+            "lower": 0.7000000000000001,
+            "upper": 0.8,
+            "count": 5,
+            "accuracy": 1.0,
+            "mean_confidence": 0.7660142857142858
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 7,
+            "accuracy": 1.0,
+            "mean_confidence": 0.8595962172747887
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 301,
+            "accuracy": 1.0,
+            "mean_confidence": 0.9932039206333227
+          }
+        ]
+      },
+      "temperature_scaled": {
+        "ece": 0.006841961995343546,
+        "brier_score": 0.0053576644695471675,
+        "nll": 0.008885963534741788,
+        "sample_count": 320,
+        "bins": [
+          {
+            "lower": 0.5,
+            "upper": 0.6000000000000001,
+            "count": 2,
+            "accuracy": 0.0,
+            "mean_confidence": 0.5386114716850274
+          },
+          {
+            "lower": 0.6000000000000001,
+            "upper": 0.7000000000000001,
+            "count": 1,
+            "accuracy": 1.0,
+            "mean_confidence": 0.6059825406920953
+          },
+          {
+            "lower": 0.7000000000000001,
+            "upper": 0.8,
+            "count": 1,
+            "accuracy": 1.0,
+            "mean_confidence": 0.7025204463217104
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 1,
+            "accuracy": 1.0,
+            "mean_confidence": 0.8842181193789505
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 315,
+            "accuracy": 1.0,
+            "mean_confidence": 0.9990319809475154
+          }
+        ]
+      },
+      "raw_operating_point": {
+        "threshold": 0.2616944444444446,
+        "recall": 1.0,
+        "fpr": 0.02,
+        "false_alarms": 1,
+        "negatives": 50,
+        "accuracy": 0.996875,
+        "precision": 0.996309963099631,
+        "f1": 0.9981515711645101,
+        "confusion": [
+          [
+            49,
+            1
+          ],
+          [
+            0,
+            270
+          ]
+        ]
+      },
+      "temperature_scaled_operating_point": {
+        "threshold": 0.03157879640900481,
+        "recall": 1.0,
+        "fpr": 0.02,
+        "false_alarms": 1,
+        "negatives": 50,
+        "accuracy": 0.996875,
+        "precision": 0.996309963099631,
+        "f1": 0.9981515711645101,
+        "confusion": [
+          [
+            49,
+            1
+          ],
+          [
+            0,
+            270
+          ]
+        ]
+      }
+    }
+  },
+  "open_set": {
+    "known_classes": [
+      "ar",
+      "background",
+      "bebop"
+    ],
+    "unknown_drone_model": "phantom",
+    "temperature": 0.36647182407550744,
+    "unknownness_definition": "1 - maximum calibrated probability among the known drone classes (Bebop, AR); background confidence is not treated as drone familiarity.",
+    "acceptance_threshold_calibrated_on": "the 95% known-drone acceptance quantile on Tier 1 validation recordings",
+    "validation_known_class_calibration": {
+      "ece": 0.0122885176230889,
+      "brier_score": 0.0725641443086824,
+      "nll": 0.1219114681424268,
+      "sample_count": 300,
+      "bins": [
+        {
+          "lower": 0.5,
+          "upper": 0.6000000000000001,
+          "count": 12,
+          "accuracy": 0.5833333333333334,
+          "mean_confidence": 0.5473862063273865
+        },
+        {
+          "lower": 0.6000000000000001,
+          "upper": 0.7000000000000001,
+          "count": 7,
+          "accuracy": 0.7142857142857143,
+          "mean_confidence": 0.6561819761879075
+        },
+        {
+          "lower": 0.7000000000000001,
+          "upper": 0.8,
+          "count": 10,
+          "accuracy": 0.9,
+          "mean_confidence": 0.7498839149399181
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 18,
+          "accuracy": 0.7777777777777778,
+          "mean_confidence": 0.8468411396263658
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 253,
+          "accuracy": 0.9920948616600791,
+          "mean_confidence": 0.9916831532320346
+        }
+      ]
+    },
+    "test_known_class_calibration": {
+      "ece": 0.03670516200375601,
+      "brier_score": 0.1321729119152492,
+      "nll": 0.21470634668676009,
+      "sample_count": 290,
+      "bins": [
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 2,
+          "accuracy": 0.0,
+          "mean_confidence": 0.46489964058262756
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6000000000000001,
+          "count": 12,
+          "accuracy": 0.6666666666666666,
+          "mean_confidence": 0.5464696504764676
+        },
+        {
+          "lower": 0.6000000000000001,
+          "upper": 0.7000000000000001,
+          "count": 10,
+          "accuracy": 0.6,
+          "mean_confidence": 0.6434288868058767
+        },
+        {
+          "lower": 0.7000000000000001,
+          "upper": 0.8,
+          "count": 17,
+          "accuracy": 0.6470588235294118,
+          "mean_confidence": 0.7506025479882861
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 17,
+          "accuracy": 0.5882352941176471,
+          "mean_confidence": 0.8426410048966331
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 232,
+          "accuracy": 0.9827586206896551,
+          "mean_confidence": 0.9903142424074965
+        }
+      ]
+    },
+    "test_known_class_confusion": {
+      "labels": [
+        "ar",
+        "background",
+        "bebop"
+      ],
+      "matrix": [
+        [
+          112,
+          3,
+          5
+        ],
+        [
+          0,
+          50,
+          0
+        ],
+        [
+          17,
+          2,
+          101
+        ]
+      ]
+    },
+    "open_set_test": {
+      "unknown_roc_auc": 0.77125,
+      "known_accept_rate": 0.041666666666666664,
+      "unknown_reject_rate": 1.0,
+      "known_count": 240,
+      "unknown_count": 30,
+      "acceptance_unknownness_threshold": 1.0934634359233153e-05
+    },
+    "test_recordings": 11
+  },
+  "limitations": [
+    "All recordings are from one lab session; this cannot establish performance on a new receiver, location, or session.",
+    "Phantom is one held-out drone model, not a representative sample of unknown transmitters.",
+    "Temperature scaling and unknownness cutoffs use validation recordings only; test recordings are not used to fit them.",
+    "ECE is top-label expected calibration error with ten equal-width probability bins.",
+    "This artifact is for the offline replay panel and research inspection; it is not connected to a live SDR."
+  ],
+  "artifact": "data/models/rf_trust.joblib"
+}
