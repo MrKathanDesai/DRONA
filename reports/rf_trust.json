@@ -5,14 +5,14 @@
   "split": "Chronological, recording-grouped Tier 1 train/validation/test. Phantom is excluded from open-set training and validation and is evaluated only as the held-out unknown drone model.",
   "binary_target_fpr": 0.01,
   "binary_calibration": {
-    "temperature": 0.3029872280111947,
-    "threshold_at_validation_fpr": 0.03157879640900481,
-    "raw_threshold_at_validation_fpr": 0.2616944444444446,
+    "temperature": 0.302874158916343,
+    "threshold_at_validation_fpr": 0.03153973827490196,
+    "raw_threshold_at_validation_fpr": 0.26169444444444456,
     "validation": {
       "raw": {
-        "ece": 0.018834162330374386,
-        "brier_score": 0.01083606232175755,
-        "nll": 0.026718197811721994,
+        "ece": 0.018847293643505784,
+        "brier_score": 0.01084250592177893,
+        "nll": 0.0267334987774172,
         "sample_count": 330,
         "bins": [
           {
@@ -27,28 +27,28 @@
             "upper": 0.8,
             "count": 8,
             "accuracy": 1.0,
-            "mean_confidence": 0.746297153078403
+            "mean_confidence": 0.7460888197450698
           },
           {
             "lower": 0.8,
             "upper": 0.9,
             "count": 4,
             "accuracy": 1.0,
-            "mean_confidence": 0.8472678571428571
+            "mean_confidence": 0.8476845238095239
           },
           {
             "lower": 0.9,
             "upper": 1.0,
             "count": 312,
             "accuracy": 1.0,
-            "mean_confidence": 0.9919715481277982
+            "mean_confidence": 0.9919576592389092
           }
         ]
       },
       "temperature_scaled": {
-        "ece": 0.002816459440708798,
-        "brier_score": 0.0055055805109314295,
-        "nll": 0.009945548665208023,
+        "ece": 0.0028137494563755167,
+        "brier_score": 0.005506406818260398,
+        "nll": 0.00994934322929246,
         "sample_count": 330,
         "bins": [
           {
@@ -56,23 +56,23 @@
             "upper": 0.9,
             "count": 3,
             "accuracy": 1.0,
-            "mean_confidence": 0.8553855252575217
+            "mean_confidence": 0.8554672449540979
           },
           {
             "lower": 0.9,
             "upper": 1.0,
             "count": 327,
             "accuracy": 0.9969418960244648,
-            "mean_confidence": 0.9984574562422216
+            "mean_confidence": 0.9984554711176337
           }
         ]
       }
     },
     "test": {
       "raw": {
-        "ece": 0.016631878682659817,
-        "brier_score": 0.011102331971199317,
-        "nll": 0.026086916660588027,
+        "ece": 0.01663135784932663,
+        "brier_score": 0.011113642181186089,
+        "nll": 0.026092301241942884,
         "sample_count": 320,
         "bins": [
           {
@@ -80,7 +80,7 @@
             "upper": 0.6000000000000001,
             "count": 4,
             "accuracy": 0.5,
-            "mean_confidence": 0.530205357142857
+            "mean_confidence": 0.5306220238095237
           },
           {
             "lower": 0.6000000000000001,
@@ -94,7 +94,7 @@
             "upper": 0.8,
             "count": 5,
             "accuracy": 1.0,
-            "mean_confidence": 0.7660142857142858
+            "mean_confidence": 0.7658809523809524
           },
           {
             "lower": 0.8,
@@ -108,14 +108,14 @@
             "upper": 1.0,
             "count": 301,
             "accuracy": 1.0,
-            "mean_confidence": 0.9932039206333227
+            "mean_confidence": 0.9932122262811631
           }
         ]
       },
       "temperature_scaled": {
-        "ece": 0.006841961995343546,
-        "brier_score": 0.0053576644695471675,
-        "nll": 0.008885963534741788,
+        "ece": 0.0068577167743179195,
+        "brier_score": 0.005395864045285791,
+        "nll": 0.008924349916128843,
         "sample_count": 320,
         "bins": [
           {
@@ -123,40 +123,40 @@
             "upper": 0.6000000000000001,
             "count": 2,
             "accuracy": 0.0,
-            "mean_confidence": 0.5386114716850274
+            "mean_confidence": 0.5413213621672381
           },
           {
             "lower": 0.6000000000000001,
             "upper": 0.7000000000000001,
             "count": 1,
             "accuracy": 1.0,
-            "mean_confidence": 0.6059825406920953
+            "mean_confidence": 0.6060209095254182
           },
           {
             "lower": 0.7000000000000001,
             "upper": 0.8,
             "count": 1,
             "accuracy": 1.0,
-            "mean_confidence": 0.7025204463217104
+            "mean_confidence": 0.7025874855550442
           },
           {
             "lower": 0.8,
             "upper": 0.9,
             "count": 1,
             "accuracy": 1.0,
-            "mean_confidence": 0.8842181193789505
+            "mean_confidence": 0.884295796213183
           },
           {
             "lower": 0.9,
             "upper": 1.0,
             "count": 315,
             "accuracy": 1.0,
-            "mean_confidence": 0.9990319809475154
+            "mean_confidence": 0.999032600524632
           }
         ]
       },
       "raw_operating_point": {
-        "threshold": 0.2616944444444446,
+        "threshold": 0.26169444444444456,
         "recall": 1.0,
         "fpr": 0.02,
         "false_alarms": 1,
@@ -176,7 +176,7 @@
         ]
       },
       "temperature_scaled_operating_point": {
-        "threshold": 0.03157879640900481,
+        "threshold": 0.03153973827490196,
         "recall": 1.0,
         "fpr": 0.02,
         "false_alarms": 1,
@@ -204,56 +204,56 @@
       "bebop"
     ],
     "unknown_drone_model": "phantom",
-    "temperature": 0.36647182407550744,
+    "temperature": 0.3652666424149329,
     "unknownness_definition": "1 - maximum calibrated probability among the known drone classes (Bebop, AR); background confidence is not treated as drone familiarity.",
     "acceptance_threshold_calibrated_on": "the 95% known-drone acceptance quantile on Tier 1 validation recordings",
     "validation_known_class_calibration": {
-      "ece": 0.0122885176230889,
-      "brier_score": 0.0725641443086824,
-      "nll": 0.1219114681424268,
+      "ece": 0.013492857829856049,
+      "brier_score": 0.07259708628592264,
+      "nll": 0.12188168306587902,
       "sample_count": 300,
       "bins": [
         {
           "lower": 0.5,
           "upper": 0.6000000000000001,
           "count": 12,
-          "accuracy": 0.5833333333333334,
-          "mean_confidence": 0.5473862063273865
+          "accuracy": 0.6666666666666666,
+          "mean_confidence": 0.5470227154354304
         },
         {
           "lower": 0.6000000000000001,
           "upper": 0.7000000000000001,
           "count": 7,
           "accuracy": 0.7142857142857143,
-          "mean_confidence": 0.6561819761879075
+          "mean_confidence": 0.6603844730089535
         },
         {
           "lower": 0.7000000000000001,
           "upper": 0.8,
-          "count": 10,
-          "accuracy": 0.9,
-          "mean_confidence": 0.7498839149399181
+          "count": 9,
+          "accuracy": 0.8888888888888888,
+          "mean_confidence": 0.7424991495254203
         },
         {
           "lower": 0.8,
           "upper": 0.9,
           "count": 18,
-          "accuracy": 0.7777777777777778,
-          "mean_confidence": 0.8468411396263658
+          "accuracy": 0.8333333333333334,
+          "mean_confidence": 0.8401723003043158
         },
         {
           "lower": 0.9,
           "upper": 1.0,
-          "count": 253,
-          "accuracy": 0.9920948616600791,
-          "mean_confidence": 0.9916831532320346
+          "count": 254,
+          "accuracy": 0.9881889763779528,
+          "mean_confidence": 0.9913157960058888
         }
       ]
     },
     "test_known_class_calibration": {
-      "ece": 0.03670516200375601,
-      "brier_score": 0.1321729119152492,
-      "nll": 0.21470634668676009,
+      "ece": 0.0396241852816124,
+      "brier_score": 0.1326219043367019,
+      "nll": 0.2155116543187721,
       "sample_count": 290,
       "bins": [
         {
@@ -261,42 +261,42 @@
           "upper": 0.5,
           "count": 2,
           "accuracy": 0.0,
-          "mean_confidence": 0.46489964058262756
+          "mean_confidence": 0.4744721476430117
         },
         {
           "lower": 0.5,
           "upper": 0.6000000000000001,
-          "count": 12,
-          "accuracy": 0.6666666666666666,
-          "mean_confidence": 0.5464696504764676
+          "count": 13,
+          "accuracy": 0.6923076923076923,
+          "mean_confidence": 0.5518389458999173
         },
         {
           "lower": 0.6000000000000001,
           "upper": 0.7000000000000001,
-          "count": 10,
-          "accuracy": 0.6,
-          "mean_confidence": 0.6434288868058767
+          "count": 9,
+          "accuracy": 0.5555555555555556,
+          "mean_confidence": 0.6525052619867828
         },
         {
           "lower": 0.7000000000000001,
           "upper": 0.8,
-          "count": 17,
-          "accuracy": 0.6470588235294118,
-          "mean_confidence": 0.7506025479882861
+          "count": 18,
+          "accuracy": 0.6666666666666666,
+          "mean_confidence": 0.7524987216940261
         },
         {
           "lower": 0.8,
           "upper": 0.9,
-          "count": 17,
-          "accuracy": 0.5882352941176471,
-          "mean_confidence": 0.8426410048966331
+          "count": 16,
+          "accuracy": 0.5625,
+          "mean_confidence": 0.8453981172055396
         },
         {
           "lower": 0.9,
           "upper": 1.0,
           "count": 232,
           "accuracy": 0.9827586206896551,
-          "mean_confidence": 0.9903142424074965
+          "mean_confidence": 0.9903969030578377
         }
       ]
     },
@@ -325,12 +325,12 @@
       ]
     },
     "open_set_test": {
-      "unknown_roc_auc": 0.77125,
+      "unknown_roc_auc": 0.7686111111111111,
       "known_accept_rate": 0.041666666666666664,
       "unknown_reject_rate": 1.0,
       "known_count": 240,
       "unknown_count": 30,
-      "acceptance_unknownness_threshold": 1.0934634359233153e-05
+      "acceptance_unknownness_threshold": 1.0530174156708771e-05
     },
     "test_recordings": 11
   },
@@ -341,5 +341,5 @@
     "ECE is top-label expected calibration error with ten equal-width probability bins.",
     "This artifact is for the offline replay panel and research inspection; it is not connected to a live SDR."
   ],
-  "artifact": "data/models/rf_trust.joblib"
+  "artifact": "data\\models\\rf_trust.joblib"
 }

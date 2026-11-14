@@ -1,0 +1,54 @@
+# Dashboard theme (streamlit run app/dashboard.py).
+#
+# The look follows the operations console (console/static/index.html), the
+# approved UI: near-black panels separated by hairlines, the console's system
+# font, small corner radius, and its state colours. The dark palette below is
+# the console's OKLCH tokens converted to hex:
+#   bg #07090c · panel #0d1012 · raised #13161a · line #1e2124 · ink #e9ebee
+#   ink-2 #a1a5a9 · ink-3 #6a6f74 · clear #83caa4 · maybe #edb755
+#   alert #f4543a · unknown #a584dc · radio #69aed5
+#
+# Two palettes, so Streamlit's own theme setting offers System / Light / Dark.
+# The dashboard opens in Dark (dronedet.status.DEFAULT_THEME); its sidebar
+# "Theme" control and the ⋮ menu -> Settings both change the same setting.
+# The light palette is the same design in light colours.
+#
+# Contrast (WCAG): dark text #e9ebee on #07090c is 16.7:1, ink-2 #a1a5a9 on
+# #07090c is 8.0:1, primary #69aed5 is 8.2:1; light text #0d1012 on #f6f7f8
+# is 17.8:1, light primary #2b6f99 is 5.1:1.
+
+[theme.light]
+base = "light"
+primaryColor = "#2b6f99"
+backgroundColor = "#f6f7f8"
+secondaryBackgroundColor = "#eceef0"
+textColor = "#0d1012"
+linkColor = "#2b6f99"
+borderColor = "#d5d9dd"
+dataframeBorderColor = "#d5d9dd"
+dataframeHeaderBackgroundColor = "#eceef0"
+showWidgetBorder = true
+baseRadius = "6px"
+font = "-apple-system, BlinkMacSystemFont, SF Pro Text, Helvetica Neue, Helvetica, Arial, sans-serif"
+chartCategoricalColors = ["#2b6f99", "#2e8a62", "#b7791f", "#c2412a", "#7a4fd6", "#5b6168"]
+
+[theme.light.sidebar]
+backgroundColor = "#eceef0"
+
+[theme.dark]
+base = "dark"
+primaryColor = "#69aed5"
+backgroundColor = "#07090c"
+secondaryBackgroundColor = "#13161a"
+textColor = "#e9ebee"
+linkColor = "#69aed5"
+borderColor = "#1e2124"
+dataframeBorderColor = "#1e2124"
+dataframeHeaderBackgroundColor = "#13161a"
+showWidgetBorder = true
+baseRadius = "6px"
+font = "-apple-system, BlinkMacSystemFont, SF Pro Text, Helvetica Neue, Helvetica, Arial, sans-serif"
+chartCategoricalColors = ["#69aed5", "#83caa4", "#edb755", "#f4543a", "#a584dc", "#a1a5a9"]
+
+[theme.dark.sidebar]
+backgroundColor = "#0d1012"

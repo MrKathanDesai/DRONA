@@ -2,16 +2,16 @@
   "target_fpr": 0.01,
   "variants": {
     "v2": {
-      "threshold": 0.34550000000000003,
+      "threshold": 0.3421666666666667,
       "test_overall": {
-        "pr_auc": 0.9995550289173916,
+        "pr_auc": 0.9995550289173915,
         "pr_auc_ci95": [
           0.9983297713482593,
           0.9999527313146156
         ],
         "roc_auc": 0.9996563573883162,
         "prevalence": 0.42731277533039647,
-        "threshold": 0.34550000000000003,
+        "threshold": 0.3421666666666667,
         "recall": 0.993127147766323,
         "fpr": 0.010256410256410256,
         "false_alarms": 4,
@@ -50,7 +50,7 @@
           "category": "noise_coloured",
           "windows": 50,
           "called_drone": 0.08,
-          "median_p": 0.11786111111111111
+          "median_p": 0.1181388888888889
         },
         {
           "source": "noise_dronerf",
@@ -85,7 +85,7 @@
           "category": "noise_pink",
           "windows": 50,
           "called_drone": 0.0,
-          "median_p": 0.013888888888888886
+          "median_p": 0.01611111111111111
         },
         {
           "source": "noise_tampere",
@@ -107,7 +107,7 @@
         "quiet_background_test_windows": 37,
         "quiet_drone_called_drone": 0.0,
         "quiet_background_called_drone": 0.0,
-        "auc_quiet_drone_vs_background": 0.8845208845208846
+        "auc_quiet_drone_vs_background": 0.8848099436334731
       },
       "tampere_lodo": [
         {
@@ -150,13 +150,13 @@
           "drone": "DJI_phantom_4_pro_plus",
           "windows": 40,
           "recall": 1.0,
-          "median_p": 0.9530555555555553
+          "median_p": 0.9530555555555555
         },
         {
           "drone": "Parrot_disco",
           "windows": 40,
           "recall": 1.0,
-          "median_p": 0.7198095238095238
+          "median_p": 0.7264761904761905
         },
         {
           "drone": "Parrot_mambo",
@@ -168,7 +168,7 @@
           "drone": "Yuneec_typhoon_h",
           "windows": 80,
           "recall": 1.0,
-          "median_p": 0.7532777777777777
+          "median_p": 0.751611111111111
         }
       ],
       "dronerf_unseen_drone_recall": {
@@ -179,7 +179,7 @@
       "noise_max_fpr": 0.08
     },
     "v2b": {
-      "threshold": 0.2907222222222222,
+      "threshold": 0.29200793650793655,
       "test_overall": {
         "pr_auc": 0.999547831788842,
         "pr_auc_ci95": [
@@ -188,7 +188,7 @@
         ],
         "roc_auc": 0.9996387346902811,
         "prevalence": 0.42731277533039647,
-        "threshold": 0.2907222222222222,
+        "threshold": 0.29200793650793655,
         "recall": 0.9965635738831615,
         "fpr": 0.01282051282051282,
         "false_alarms": 5,
@@ -234,7 +234,7 @@
           "category": "noise_pink",
           "windows": 50,
           "called_drone": 0.0,
-          "median_p": 0.06384920634920635
+          "median_p": 0.06607142857142857
         },
         {
           "source": "noise_dronerf",
@@ -276,7 +276,7 @@
           "category": "drone",
           "windows": 40,
           "called_drone": 1.0,
-          "median_p": 0.9909722222222224
+          "median_p": 0.9909722222222221
         }
       ],
       "quiet_check": {
@@ -284,7 +284,7 @@
         "quiet_background_test_windows": 37,
         "quiet_drone_called_drone": 0.0,
         "quiet_background_called_drone": 0.0,
-        "auc_quiet_drone_vs_background": 0.9179794768030061
+        "auc_quiet_drone_vs_background": 0.9185575950281832
       },
       "tampere_lodo": [
         {
@@ -338,7 +338,7 @@
         {
           "drone": "Parrot_mambo",
           "windows": 72,
-          "recall": 0.8472222222222222,
+          "recall": 0.8333333333333334,
           "median_p": 0.4522777777777778
         },
         {

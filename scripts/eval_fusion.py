@@ -26,7 +26,8 @@ pairs only (audio tier-4 val x RF v2 val). Scenarios:
   called all of it "drone" (rf_tampere.md); the v2 detector should not
 
 Writes reports/fusion.{json,md}, reports/figures/12_fusion_ablation.png and
-data/models/fusion.joblib.
+data/models/fusion.joblib plus both rule objects in
+data/models/fusion_models.joblib.
 """
 from __future__ import annotations
 
@@ -291,7 +292,13 @@ def main() -> int:
                                   normalize="index").round(3).to_dict(orient="index"))
         print(f"  {name}: done", flush=True)
 
-    joblib.dump(fus[DEPLOY], DATA_DIR / "models" / "fusion.joblib")
+    models_dir = DATA_DIR / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    joblib.dump(fus[DEPLOY], models_dir / "fusion.joblib")
+    joblib.dump(
+        {"deployed": DEPLOY, "methods": fus},
+        models_dir / "fusion_models.joblib",
+    )
     weights = fus["learned"].learned.coef_.ravel().tolist()
     report = {"target_fpr": TARGET_FPR, "llr_cap": LLR_CAP, "pairs_per_class": N_PAIRS,
               "deploy": DEPLOY, "learned_weights_audio_rf": weights,

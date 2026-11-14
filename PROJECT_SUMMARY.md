@@ -12,8 +12,8 @@
 | **Identification** | Done. Which-drone confusion matrices: audio balanced accuracy 0.89, RF 0.94 (RF carries the caveat). |
 | **Noise robustness** | Done, now with real speech and music. Holds at 20 dB SNR; at 0 dB recall drops to 0.27–0.74. Noise augmentation helps in every condition, including real speech and music it never trained on. |
 | **Uncertainty / open set** | Done for audio and RF. Four states per window. The review band catches most errors; the unseen-drone flag works for audio (AUROC 0.81) and for RF Bebop / Phantom (0.97) but not RF AR (0.45). |
-| **Fusion** | Done (section 7d). Calibrated evidence, summed; audio-only vs RF-only vs fused ablation. RF v2 carries most of the detection; the sum keeps audio's recall for an RF-silent drone and cuts helicopter false alarms. |
-| **Dashboard** | Done. `streamlit run app/dashboard.py`: live-feed replay, states, Grad-CAM, optional RF feed with fused state. |
+| **Fusion** | Evaluated on unpaired synthetic pairs (section 7d), an upper bound. Calibrated evidence, summed (deployed); the learned layer is reported but not deployed (0.002 recall on RF-silent drones). RF v2 carries most of the detection; the sum keeps audio's recall for an RF-silent drone and cuts helicopter false alarms. RF v2 and fusion models were rebuilt and re-verified on 14 Nov 2026; the dashboard shows the audio, RF and fused decision side by side. |
+| **Dashboard** | Done. `streamlit run app/dashboard.py`: project briefing (readiness read from `data/`, four states, headline results, limits), replay detector with the recording-level result first and per-sensor evidence, Grad-CAM, optional replay of recorded RF test windows (not a live receiver), System / Light / Dark theme. |
 | **Live page** | Done. `python -m console`: microphone or audio file, with a secondary panel replaying recorded radio. Alarm rule calibrated on validation recordings: alarms on 57% of outdoor test drone recordings for 1.7% of background ones (`live_calibration.md`). |
 | **Outdoor aircraft** | Held-out AeroSonicDB sessions (real low-flying aircraft near Adelaide airport, ADS-B-labelled): no alarm on any of 99 aircraft or 317 outdoor-ambience recordings. Partly because the detector is conservative outdoors (15% of Svanström drone windows). Adding aircraft as training negatives did not help, so it is not deployed (`aircraft.md`). |
 | **Music masking** | The threat in the proposal: loud music played to hide a drone. Under equal-loudness music the detector catches 17% of drone windows; a detector trained with music mixtures catches 45% (0.39 -> 0.55 at +5 dB, 0.05 -> 0.21 at -5 dB; indoor validation recordings) and music alone still raises no alarms (an experiment; not used on the live page). A stationary-component front-end, which looked strong on synthetic rotors, fails on real recordings: reported as a negative result (`masking.md`). |
@@ -286,12 +286,14 @@ Format: PR-AUC / recall at the frozen threshold. False alarms: 0–1 of 50 on ti
 |---|---|---|---|---|
 | **Logistic regression** | 0.998 / 0.985 | 0.999 / 0.977 | 1.000 / 0.994 | 0.580 / 0.076 |
 | **Random forest** | 1.000 / 1.000 | 1.000 / 0.988 | 1.000 / 0.991 | 1.000 / 0.976 |
-| **1D-CNN** | 1.000 / 0.978 | 1.000 / 0.926 | 1.000 / 0.967 | 1.000 / 0.990 |
+| **1D-CNN** | 1.000 / 0.993 | 1.000 / 0.885 | 1.000 / 0.957 | 1.000 / 1.000 |
+
+Rerun on 14 Nov 2026 from the re-prepared DroneRF cache: logistic regression and forest reproduce exactly; the 1D-CNN's recalls moved by 0.01–0.04 (earlier run: 0.978 / 0.926 / 0.967 / 0.990), as CPU training of a small network is not bit-for-bit repeatable across machines.
 
 Other results (forest, tier 1):
 
 - **Per segment:** 27 of 27 drone segments alarmed, 0 of 5 background.
-- **Identifying the drone type:** 292 of 320 test windows correct, mostly confusing Bebop with AR.
+- **Identifying the drone type:** 291 of 320 test windows correct (292 in the earlier run), mostly confusing Bebop with AR.
 
 ### Why these scores cannot be trusted
 
@@ -386,7 +388,7 @@ No dataset records audio and RF of the same flight, so fusion is late: each sens
 
 1. **Calibrate** each sensor on its own validation windows (class-balanced Platt scaling), turning its score into a log-likelihood ratio (LLR): positive = evidence for a drone, 0 = none.
 2. **Cap** each LLR at ±5.
-3. **Combine**: `sum` adds the two LLRs; `learned` is the proposal's fusion layer, a logistic regression on the two (weights audio 1.01, RF 1.60). A missing sensor contributes 0, and each set of available sensors has its own threshold.
+3. **Combine**: `sum` adds the two LLRs; `learned` is the proposal's fusion layer, a logistic regression on the two (weights audio 1.00, RF 1.60). A missing sensor contributes 0, and each set of available sensors has its own threshold.
 4. **Decide** at 1% false alarms on validation pairs, with the same four states.
 
 Evaluation uses synthetic pairs: an outdoor Svanström audio window and an RF window of the same class, drawn independently (4000 per class). Recall / false-alarm rate:
@@ -397,8 +399,8 @@ Evaluation uses synthetic pairs: an outdoor Svanström audio window and an RF wi
 | RF only | 0.993 / 0.000 | 0.000 / 0.000 | 0.993 / 0.013 |
 | OR | 0.995 / 0.007 | 0.223 / 0.012 | 0.993 / 0.023 |
 | AND | 0.224 / 0.000 | 0.000 / 0.000 | 0.224 / 0.000 |
-| **sum (deployed)** | 0.995 / 0.005 | 0.184 / 0.009 | 0.992 / 0.028 |
-| learned | 0.996 / 0.000 | 0.002 / 0.000 | 0.995 / 0.021 |
+| **sum (deployed)** | 0.995 / 0.005 | 0.184 / 0.008 | 0.992 / 0.028 |
+| learned | 0.996 / 0.000 | 0.002 / 0.000 | 0.995 / 0.022 |
 
 - **With both sensors** fusion matches RF v2 alone (recall ~0.99, no false alarms on DroneRF background). Audio adds little here, because RF's test negatives are its best case (one lab).
 - **RF-silent (autonomous) drone:** the sum keeps most of audio's recall (0.184 vs 0.223); the learned layer collapses (0.002), because it never saw a drone without a radio link. That is why the sum is deployed (a choice made after seeing this result).
@@ -412,12 +414,14 @@ Evaluation uses synthetic pairs: an outdoor Svanström audio window and an RF wi
 - Tier 4 reused those settings and was not tuned on Svanström, but tier 3 test data had already been seen.
 - The test sets are 12–33% drone, far more than real life. At 1% drone windows, tier 4 precision would fall from 0.917 to about 0.18.
 - `scripts/detect.py` and the dashboard use the tier 4 detector; outdoor recall is still only about 22% of windows.
-- Audio probabilities are not calibrated; its uncertainty flags rely on ranks only. RF calibration helpers are implemented but have not been run because the prepared DroneRF feature cache is absent.
+- Audio probabilities are not calibrated; its uncertainty flags rely on ranks only. RF temperature scaling and calibration metrics are reported in `reports/rf_trust.md`; these are single-session results, not independent RF validation.
 - Noise mixing is additive at fixed SNR: no reverberation, distance or microphone effects.
 - `data/models/rf_forest.joblib` and `rf_detector_dronerf.joblib` (v1) are not usable detectors: they call pure noise "drone". `rf_detector.joblib` is v2.
 - RF v2's only real no-drone recordings are DroneRF's lab background; its noise negatives are synthetic. Its false-alarm rate on real 2.4 GHz traffic elsewhere is unknown, and it misses a band-filling signal like DroneRF's Phantom when that drone is not in training.
 - Fusion is evaluated on synthetic pairs (no co-recorded audio + RF exists), which matches the independence the sum rule assumes: an upper bound.
 - The deployed fusion rule (sum) was switched from the planned learned layer after seeing the RF-silent result on test pairs.
+- Reports are not artifacts: the dashboard's briefing page checks the model and data files on disk. On 14 Nov 2026 all RF and fusion artifacts were rebuilt from checksummed data and the reports regenerated; RF v1's small 1D-CNN reproduced within 0.01-0.04 recall, everything else exactly or to the last printed digit.
+- There is no RF receiver integration: every RF result is computed on recorded datasets.
 - The from-scratch audio models' tier 2 threshold comes from one 20% hold-out of training recordings, not 5 grouped folds.
 
 ## 9. What is left

@@ -6,6 +6,7 @@
     python scripts/prepare_rf.py --download-only   # leave it running overnight
     python scripts/prepare_rf.py --process-only    # archives already here
     python scripts/prepare_rf.py --only 00000_L1 00000_H1   # a few archives
+    python scripts/prepare_rf.py --process-only --workers 3 # bound memory use
 
 Fetches 23 RAR archives (4.0 GB) from Mendeley Data, checks each against its
 published SHA-256, and streams them through bsdtar or 7-Zip, so the 45 GB of
@@ -188,11 +189,15 @@ def _one_archive(path: str, cfg: R.RFConfig) -> list[tuple]:
     return out
 
 
-def process(archives: list[dict], cfg: R.RFConfig = R.DEFAULT) -> bool:
+def process(archives: list[dict], cfg: R.RFConfig = R.DEFAULT,
+            workers: int | None = None) -> bool:
     paths = [str(RAW / a["name"]) for a in archives]
-    print(f"  streaming {len(paths)} archives ...")
+    print(f"  streaming {len(paths)} archives with "
+          f"{workers or 'one worker per CPU'} worker(s) ...")
     t0, parts = time.time(), defaultdict(dict)
-    with ProcessPoolExecutor() as pool:
+    # Each worker holds one 10 M-sample CSV line as text (~0.3 GB peak), so
+    # --workers bounds memory; the default is one per CPU.
+    with ProcessPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(_one_archive, p, cfg) for p in paths]
         for k, fut in enumerate(as_completed(futures), 1):
             for bui, band, seg, psd, level in fut.result():
@@ -270,7 +275,13 @@ def main() -> int:
     ap.add_argument("--only", nargs="+", metavar="KEY",
                     help="archive keys, e.g. 00000_L1 11000_H")
     ap.add_argument("--jobs", type=int, default=4, help="parallel downloads")
+    ap.add_argument("--workers", type=int, default=None,
+                    help="parallel archive-processing workers (default: one per CPU; "
+                         "about 0.3-0.4 GB RAM each, so use 2-4 on a 16 GB machine "
+                         "that is doing other work)")
     args = ap.parse_args()
+    if args.workers is not None and args.workers < 1:
+        ap.error("--workers must be at least 1")
 
     if not any((shutil.which("bsdtar"), shutil.which("7z"),
                 shutil.which("7z.exe"),
@@ -305,7 +316,7 @@ def main() -> int:
     if missing:
         warn(f"{len(missing)} archives missing, e.g. {missing[0]}")
         return 1
-    return 0 if process(archives) else 1
+    return 0 if process(archives, workers=args.workers) else 1
 
 
 if __name__ == "__main__":

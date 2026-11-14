@@ -10,7 +10,7 @@
   "active_windows": 472,
   "quiet_windows": 8,
   "quiet_called_drone": 1.0,
-  "quiet_median_p": 0.9017903439153439,
+  "quiet_median_p": 0.9016514550264549,
   "per_drone": [
     {
       "drone": "DJI_inspire_2",
@@ -79,7 +79,7 @@
       "drone": "Parrot_mambo_video",
       "windows": 40,
       "recall": 1.0,
-      "median_p": 0.9256104497354498,
+      "median_p": 0.9256104497354497,
       "quiet": 8
     },
     {
