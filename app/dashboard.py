@@ -33,6 +33,14 @@ import streamlit as st
 from dronedet import live as L
 from dronedet import media as M
 from dronedet import status as S
+
+# Streamlit re-runs this file when it changes but keeps helper modules from
+# src/ in memory, so a server started before an update would use stale ones.
+# These two are small and pure: reload them when they are out of date.
+if not hasattr(S, "alarm_episodes"):
+    S = importlib.reload(S)
+if not hasattr(M, "fetch_url"):
+    M = importlib.reload(M)
 from dronedet.eval import calibration as RF_CALIBRATION
 from dronedet.eval import open_set as RF_OPEN_SET
 from dronedet.models import explain as X
