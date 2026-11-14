@@ -40,8 +40,10 @@ from dronedet.models import rf as RF_MODEL
 from dronedet.paths import DATA_DIR
 
 REPORTS = ROOT / "reports"
-STATE_COLOR = {"drone": "#d6452a", "unknown drone": "#7a4fd6",
-               "low confidence": "#d99a0b", "no drone": "#8a8984"}
+# The console's state hues (console/static/index.html): alert, unknown,
+# caution. No Drone stays neutral grey: it is not proof that the sky is clear.
+STATE_COLOR = {"drone": "#f4543a", "unknown drone": "#a584dc",
+               "low confidence": "#edb755", "no drone": "#8a8984"}
 STATE_ICON = {"drone": "🔴", "unknown drone": "🟣", "low confidence": "🟡", "no drone": "⚪"}
 FINAL_STATE_LABEL = S.STATE_LABEL
 # Mid-tone so a reference line / marker reads on light and dark charts alike.
@@ -59,116 +61,175 @@ st.set_page_config(page_title="Skyguard · Counter-drone Lab", page_icon="🛰�
 # data-testid attributes only (checked against streamlit 1.67).
 APP_CSS = """
 <style>
+/* Console design language (console/static/index.html): hairline-separated
+   flat panels, small uppercase letter-spaced labels, state colours.
+   Colours are mixed with currentColor (the theme's text colour) so the
+   same rules work in the dark default and in the light palette. */
 :root {
-    --dd-accent: #0e7490;
-    --dd-amber: #b45309;
-    --dd-line: color-mix(in srgb, currentColor 16%, transparent);
-    --dd-soft: color-mix(in srgb, currentColor 4%, transparent);
-    --dd-muted: color-mix(in srgb, currentColor 72%, transparent);
+    --c-clear: #83caa4; --c-maybe: #edb755; --c-alert: #f4543a;
+    --c-unknown: #a584dc; --c-radio: #69aed5;
+    --dd-accent: #69aed5;
+    --dd-amber: #edb755;
+    --dd-line: color-mix(in srgb, currentColor 13%, transparent);
+    --dd-line-2: color-mix(in srgb, currentColor 22%, transparent);
+    --dd-soft: color-mix(in srgb, currentColor 3.5%, transparent);
+    --dd-muted: color-mix(in srgb, currentColor 66%, transparent);
+    --dd-faint: color-mix(in srgb, currentColor 48%, transparent);
 }
-.block-container { max-width: 1440px; padding-top: 1.8rem; }
-h1, h2, h3 { letter-spacing: -.02em; }
+.block-container { max-width: 1600px; padding-top: 3.2rem; }
+/* Titles inside embedded reports (expanders) stay modest, like a panel title. */
+.block-container h1 {
+    font-size: 1.15rem !important; font-weight: 650 !important; letter-spacing: 0;
+    line-height: 1.3 !important; padding: .2rem 0 .4rem !important;
+}
+/* Section headings read like the console's panel heads. */
+.block-container h2, .block-container h3 {
+    font-size: .8rem !important; font-weight: 650 !important; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--dd-muted);
+    padding: .35rem 0 .45rem; margin-top: .9rem; border-bottom: 1px solid var(--dd-line);
+}
+.block-container h4, .block-container h5 {
+    font-size: .74rem !important; font-weight: 650 !important; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--dd-faint);
+}
+[data-testid="stSidebar"] { border-right: 1px solid var(--dd-line); }
+[data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+    font-size: .72rem !important; font-weight: 650 !important; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--dd-muted); border: 0; margin-top: .6rem;
+}
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+    font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--dd-faint);
+}
+/* Tabs: uppercase, spaced, like the console's labels. */
+[data-testid="stTabs"] [role="tab"] p {
+    font-size: .74rem; font-weight: 650; letter-spacing: .14em; text-transform: uppercase;
+}
+/* Buttons: the console's uppercase pill buttons. */
+[data-testid^="stBaseButton"] {
+    text-transform: uppercase; letter-spacing: .14em; font-weight: 700;
+    font-size: .72rem; border-radius: 6px;
+}
+[data-testid^="stBaseButton"] p { font-size: .72rem; font-weight: 700; }
+/* Metrics: a console sensor tile. */
 [data-testid="stMetric"] {
     background: var(--dd-soft); border: 1px solid var(--dd-line);
-    border-radius: 12px; padding: 12px 14px;
+    border-radius: 6px; padding: 12px 14px;
 }
-.hero {
-    padding: clamp(18px, 3vw, 32px); margin: 0 0 1rem;
-    border: 1px solid var(--dd-line); border-radius: 18px;
-    background: color-mix(in srgb, var(--dd-accent) 9%, transparent);
+[data-testid="stMetricLabel"] p {
+    font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--dd-faint);
 }
-.eyebrow, .panel .tag {
-    color: color-mix(in srgb, var(--dd-accent) 62%, currentColor);
-    text-transform: uppercase; letter-spacing: .14em;
-    font: 700 .72rem/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
-}
-.hero h1 { margin: .3rem 0 .4rem; font-size: clamp(1.8rem, 4.5vw, 2.8rem); }
-.hero p { color: var(--dd-muted); max-width: 820px; margin: 0; line-height: 1.6; }
-.pill {
-    display: inline-block; border: 1px solid var(--dd-line); border-radius: 999px;
-    padding: 4px 10px; margin: 12px 6px 0 0; font-size: .78rem; background: var(--dd-soft);
-}
-.panel {
-    height: 100%; padding: 16px; border-radius: 14px;
-    background: var(--dd-soft); border: 1px solid var(--dd-line);
-}
-.panel h3 { margin: 6px 0 4px; font-size: 1.08rem; }
-.panel p { color: var(--dd-muted); font-size: .92rem; line-height: 1.5; margin: 0; }
-.panel.pending { border-color: color-mix(in srgb, var(--dd-amber) 55%, transparent); }
-.panel.pending .tag { color: color-mix(in srgb, var(--dd-amber) 70%, currentColor); }
-.callout {
-    padding: 13px 16px; margin: 8px 0 16px; line-height: 1.55; border-radius: 10px;
-    background: color-mix(in srgb, var(--dd-amber) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--dd-amber) 40%, transparent);
-    border-left: 5px solid var(--dd-amber);
-}
-.stage-flow {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px; margin: 10px 0 18px;
-}
-.stage { padding: 14px; border: 1px solid var(--dd-line); border-radius: 12px;
-         background: var(--dd-soft); }
-.stage small { color: color-mix(in srgb, var(--dd-accent) 62%, currentColor);
-               letter-spacing: .08em; text-transform: uppercase; font-weight: 700; }
-.stage strong { display: block; margin: 6px 0; font-size: 1.02rem; }
-.stage span { color: var(--dd-muted); font-size: .9rem; line-height: 1.5; }
-.result {
-    padding: 16px 20px; margin: 4px 0 14px; border-radius: 14px;
-    border: 1px solid color-mix(in srgb, var(--state) 50%, transparent);
-    border-left: 10px solid var(--state);
-    background: color-mix(in srgb, var(--state) 11%, transparent);
-}
-.result .kicker { font-size: .78rem; letter-spacing: .1em; text-transform: uppercase;
-                  color: var(--dd-muted); font-weight: 700; }
-.result .state { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800;
-                 line-height: 1.15; margin: .15rem 0 .35rem; }
+[data-testid="stMetricValue"] { font-weight: 600; letter-spacing: -.01em; }
+[data-testid="stExpander"] details { border: 1px solid var(--dd-line); border-radius: 6px; }
+[data-testid="stExpander"] summary p { font-weight: 600; }
+[data-testid="stAlert"] { border-radius: 6px; }
+
+/* ---- the console's top bar ---- */
+.cbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px;
+        padding: 10px 2px 12px; border-bottom: 1px solid var(--dd-line); margin-bottom: 6px; }
+.cbar .mark { font-size: 15px; font-weight: 700; letter-spacing: .32em; }
+.cbar .site, .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: .14em;
+        text-transform: uppercase; color: var(--dd-faint); }
+.cbar .sep { width: 1px; height: 20px; background: var(--dd-line-2); }
+.threat { min-width: 120px; text-align: center; padding: 6px 12px; border-radius: 6px;
+          font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+          color: var(--tone); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 55%, transparent);
+          background: color-mix(in srgb, var(--tone) 10%, transparent); }
+.cbar .health { display: flex; flex-wrap: wrap; gap: 14px; }
+.cbar .health span { display: inline-flex; align-items: center; gap: 7px; }
+.cdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none;
+        background: var(--dd-faint); }
+.cdot.on { background: var(--c-clear); } .cdot.rf { background: var(--c-radio); }
+.cdot.warn { background: var(--c-maybe); } .cdot.hit { background: var(--c-alert); }
+.cbar .spacer { flex: 1; }
+.cbar .clock { font-size: 12px; font-weight: 500; color: var(--dd-muted);
+               font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.cstrip { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline;
+          padding: 6px 2px 10px; }
+.cstrip p { margin: 0; color: var(--dd-muted); font-size: .88rem; line-height: 1.5; flex: 1 1 520px; }
+
+/* ---- panels used across the pages (console tiles) ---- */
+.eyebrow, .panel .tag { color: var(--dd-faint); text-transform: uppercase; letter-spacing: .14em;
+    font-size: 10.5px; font-weight: 600; }
+.pill { display: inline-block; border: 1px solid var(--dd-line-2); border-radius: 6px;
+        padding: 3px 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .14em;
+        text-transform: uppercase; color: var(--dd-muted); }
+.panel { height: 100%; padding: 14px 16px; border-radius: 6px;
+         background: var(--dd-soft); border: 1px solid var(--dd-line); }
+.panel .tag::before { content: ""; display: inline-block; width: 7px; height: 7px;
+         border-radius: 50%; margin-right: 8px; vertical-align: 1px; background: var(--c-clear); }
+.panel.pending .tag::before { background: var(--c-maybe); }
+.panel h3 { margin: 8px 0 4px !important; padding: 0 !important; border: 0 !important;
+            font-size: 1.05rem !important; letter-spacing: 0 !important; text-transform: none !important;
+            color: inherit !important; }
+.panel p { color: var(--dd-muted); font-size: .9rem; line-height: 1.5; margin: 0; }
+.callout { padding: 12px 16px; margin: 8px 0 16px; line-height: 1.55; border-radius: 6px;
+           background: color-mix(in srgb, var(--dd-amber) 8%, transparent);
+           border: 1px solid color-mix(in srgb, var(--dd-amber) 35%, transparent);
+           border-left: 3px solid var(--dd-amber); }
+.stage-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+              margin: 10px 0 18px; background: var(--dd-soft);
+              border: 1px solid var(--dd-line); border-radius: 6px; overflow: hidden; }
+.stage { padding: 14px; }
+.stage-flow .stage + .stage { border-left: 1px solid var(--dd-line); }
+.stage small { color: var(--dd-faint); letter-spacing: .14em; text-transform: uppercase;
+               font-weight: 600; font-size: 10.5px; }
+.stage strong { display: block; margin: 6px 0; font-size: 1rem; }
+.stage span { color: var(--dd-muted); font-size: .88rem; line-height: 1.5; }
+.result { padding: 16px 20px; margin: 4px 0 14px; border-radius: 6px;
+          border: 1px solid color-mix(in srgb, var(--state) 45%, transparent);
+          border-left: 4px solid var(--state);
+          background: color-mix(in srgb, var(--state) 9%, transparent); }
+.result .kicker { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+                  color: var(--dd-faint); font-weight: 600; }
+.result .state { font-size: clamp(1.6rem, 3.6vw, 2.2rem); font-weight: 650;
+                 line-height: 1.15; margin: .2rem 0 .35rem; }
 .result p { margin: .2rem 0; line-height: 1.5; }
 .result .meaning { color: var(--dd-muted); }
-.sensor { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--dd-line);
+.sensor { padding: 12px 14px; border-radius: 6px; border: 1px solid var(--dd-line);
           background: var(--dd-soft); height: 100%; }
 .sensor h4 { margin: 0 0 4px; font-size: 1rem; }
-.sensor p { margin: .15rem 0; font-size: .92rem; line-height: 1.45; }
+.sensor p { margin: .15rem 0; font-size: .9rem; line-height: 1.45; }
 .sensor .muted { color: var(--dd-muted); }
-.badge { display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .06em;
-         text-transform: uppercase; border-radius: 6px; padding: 2px 7px;
-         border: 1px solid var(--dd-line); margin-right: 4px; }
-.badge.ok { border-color: color-mix(in srgb, #15803d 60%, transparent);
-            color: color-mix(in srgb, #15803d 70%, currentColor); }
-.badge.warn { border-color: color-mix(in srgb, var(--dd-amber) 60%, transparent);
-              color: color-mix(in srgb, var(--dd-amber) 70%, currentColor); }
+.badge { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .14em;
+         text-transform: uppercase; border-radius: 4px; padding: 2px 7px;
+         border: 1px solid var(--dd-line-2); margin-right: 4px; }
+.badge.ok { color: var(--c-clear); border-color: color-mix(in srgb, var(--c-clear) 55%, transparent); }
+.badge.warn { color: var(--c-maybe); border-color: color-mix(in srgb, var(--c-maybe) 55%, transparent); }
 .badge.off { color: var(--dd-muted); }
 .flow { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; margin: 6px 0 14px; }
-.flow .op { align-self: center; font-size: 1.8rem; font-weight: 800; color: var(--dd-muted);
-            padding: 0 2px; }
-.tile { flex: 1 1 210px; padding: 14px 16px; border-radius: 14px;
-        border: 2px solid color-mix(in srgb, var(--state) 60%, transparent);
-        background: color-mix(in srgb, var(--state) 12%, transparent); }
-.tile.final { flex: 1.3 1 240px; border-width: 3px;
-              background: color-mix(in srgb, var(--state) 20%, transparent); }
+.flow .op { align-self: center; font-size: 1.6rem; font-weight: 700; color: var(--dd-faint); padding: 0 2px; }
+.tile { flex: 1 1 210px; padding: 14px 16px; border-radius: 6px;
+        border: 1px solid color-mix(in srgb, var(--state) 55%, transparent);
+        background: color-mix(in srgb, var(--state) 8%, transparent); }
+.tile.final { flex: 1.3 1 240px; border-width: 2px;
+              background: color-mix(in srgb, var(--state) 15%, transparent); }
 .tile.off { border-style: dashed; background: var(--dd-soft); }
-.tile .k { font-size: .74rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
-           color: var(--dd-muted); }
-.tile .v { font-size: 1.45rem; font-weight: 800; margin: 2px 0 8px; line-height: 1.2; }
+.tile .k { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+           color: var(--dd-faint); }
+.tile .k::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+           margin-right: 8px; vertical-align: 1px; background: var(--state); }
+.tile .v { font-size: 1.45rem; font-weight: 650; margin: 4px 0 8px; line-height: 1.2; }
 .tile.final .v { font-size: 1.8rem; }
 .tile p { margin: .2rem 0 0; font-size: .86rem; line-height: 1.4; color: var(--dd-muted); }
-.gauge { position: relative; height: 12px; border-radius: 6px; margin: 4px 0 6px;
+.gauge { position: relative; height: 8px; border-radius: 4px; margin: 4px 0 6px;
          background: color-mix(in srgb, currentColor 12%, transparent); }
-.gauge span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; }
-.gauge i { position: absolute; top: -4px; bottom: -4px; width: 3px; border-radius: 2px;
+.gauge span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.gauge i { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 1px;
            background: currentColor; transform: translateX(-1px); }
 /* Visible keyboard focus on everything a keyboard can reach. */
 a:focus-visible, button:focus-visible, [role="tab"]:focus-visible,
 [role="radio"]:focus-visible, input:focus-visible, summary:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--dd-accent) 70%, currentColor) !important;
-    outline-offset: 2px;
+    outline: 2px solid currentColor !important; outline-offset: 2px;
 }
-[data-testid="stTabs"] button { font-weight: 650; }
 @media (max-width: 900px) { .stage-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
-    .block-container { padding: 1rem .75rem 2rem; }
+    .block-container { padding: 3rem .75rem 2rem; }
     .stage-flow { grid-template-columns: 1fr; }
     [data-testid="stTabs"] [role="tablist"] { overflow-x: auto; flex-wrap: nowrap; }
-    [data-testid="stTabs"] button { white-space: nowrap; font-size: .85rem; }
+    [data-testid="stTabs"] button { white-space: nowrap; }
+    .cbar .spacer { display: none; }
 }
 </style>
 """
@@ -406,21 +467,48 @@ def rf_figure(psd: np.ndarray):
 
 
 def hero():
+    """Mission strip under the top bar: what this is, in the console's style."""
     st.markdown(
         """
-        <div class="hero" role="banner">
-          <div class="eyebrow">Research prototype · audio + RF drone detection</div>
-          <h1>Skyguard counter-drone lab</h1>
-          <p>Detects drones from their sound (1-second microphone windows) and, as a
-          research experiment, from their 2.4 GHz radio link, then reports one of four
-          states: No Drone, Known Drone, Unknown Drone or Low Confidence. Everything
-          here runs on recorded datasets; nothing is connected to a live microphone
-          array or RF receiver, and nothing is field-validated.</p>
+        <div class="cstrip" role="note">
+          <span class="pill">Research prototype</span>
           <span class="pill">Offline replay of recordings</span>
           <span class="pill">No live RF receiver</span>
           <span class="pill">Human review required</span>
+          <p>Detects drones from their sound (1-second microphone windows) and, as a research
+          experiment, from their 2.4 GHz radio link, then reports one of four states: No Drone,
+          Known Drone, Unknown Drone or Low Confidence. Everything here runs on recorded
+          datasets; nothing is connected to a live microphone array or RF receiver, and nothing
+          is field-validated.</p>
         </div>
         """,
+        unsafe_allow_html=True,
+    )
+
+
+def top_bar(state: str | None, rf_used: bool):
+    """The console's top bar: mark, site, threat badge, sensor health, clock.
+    The badge shows the final state of the clip loaded in Replay detector."""
+    from datetime import datetime, timezone
+    artifacts = {a.name: a for a in S.artifact_status(DATA_DIR)}
+    audio_ok = artifacts["Audio detector (tier 4 + uncertainty flags)"].ready
+    rf_ok = S.rf_replay_ready(list(artifacts.values()))
+    label = "Standby" if state is None else S.STATE_LABEL.get(state, "Low Confidence")
+    tone = STATE_COLOR.get(state, "#8a8984")
+    rf_text = "Radio · replay on" if rf_used else ("Radio · ready" if rf_ok else "Radio · not built")
+    clock = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+    st.markdown(
+        f'''<div class="cbar" role="banner">
+          <span class="mark">DRONA</span><span class="site">Site 01</span><span class="sep"></span>
+          <span class="threat" style="--tone:{tone}" aria-label="Current result: {label}">{label}</span>
+          <span class="health">
+            <span class="lbl"><i class="cdot {"on" if audio_ok else ""}"></i>Acoustic</span>
+            <span class="lbl"><i class="cdot {"rf" if rf_ok else ""}"></i>{rf_text}</span>
+          </span>
+          <span class="spacer"></span>
+          <span class="lbl"><i class="cdot on"></i> Link</span>
+          <span class="clock">{clock}</span>
+        </div>''',
         unsafe_allow_html=True,
     )
 
@@ -2093,6 +2181,7 @@ def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = Non
                "as soon as a clip is loaded, and the result appears here. Nothing is retrained: "
                "the clip is only evaluated. This is an offline replay, not a live sensor feed.")
     inputs = inputs if inputs is not None else sidebar_inputs(manifest)
+    st.session_state["bar_state"], st.session_state["bar_rf"] = None, False
     key, audio = inputs["key"], inputs["audio"]
     feed, rf_src, fusion_method = inputs["feed"], inputs["rf_src"], inputs["fusion_method"]
     hop, min_hits = inputs["hop"], inputs["min_hits"]
@@ -2130,6 +2219,7 @@ def render_live_monitor(manifest: pd.DataFrame | None, inputs: dict | None = Non
         df["shown_state"], df["shown_reason"] = df.state, df.reason
     df["shown_label"] = df.shown_state.map(S.state_label)
     verdict = S.recording_verdict(df.shown_state, min_hits)
+    st.session_state["bar_state"], st.session_state["bar_rf"] = verdict.state, use_rf
     title = Path(key).stem if not key.startswith("upload") else key.split(":")[1]
 
     # 1. The result, first.
@@ -2323,6 +2413,7 @@ def main():
     manifest = pd.read_parquet(manifest_path) if manifest_path.exists() else None
 
     inputs = sidebar_inputs(manifest)
+    bar_slot = st.empty()
     hero()
     if inputs["audio"] is not None:
         title = (Path(inputs["key"]).stem if not inputs["key"].startswith("upload")
@@ -2355,6 +2446,8 @@ def main():
                     reports["dronedetect_subset"], reports["rf_trust"])
     with tabs[5]:
         guarded("Proposal checklist", render_methods_tab)
+    with bar_slot.container():
+        top_bar(st.session_state.get("bar_state"), st.session_state.get("bar_rf", False))
 
 
 def guarded(section: str, render, *args):

@@ -121,6 +121,12 @@ from `imageio-ffmpeg`); at most the first 5 minutes are analysed. Expect
 misses on outdoor or internet clips: outdoors the detector catches about a
 fifth of drone windows (see the results). Use only clips you may use.
 
+**Look.** The dashboard uses the operations console's design (the approved
+UI in `console/static/index.html`): the "DRONA" top bar with a state badge
+(STANDBY until a clip is analysed, then that clip's final state), sensor
+status dots and a UTC clock; hairline panels; small uppercase labels; the
+console's colours.
+
 **Theme.** The dashboard opens in **Dark**. Sidebar → Theme switches to System
 (follows the OS/browser) or Light. The choice is kept in the URL
 (`?theme=light`), so it survives reruns and reloads; it drives Streamlit's own
