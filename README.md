@@ -1,7 +1,7 @@
 # dronedet
 
 Acoustic + RF drone detection, built and evaluated on public datasets. No special hardware:
-the live page runs on a laptop microphone. `PROJECT_SUMMARY.md` has every result in one place.
+the live page runs on a laptop microphone. Every experiment has a results page in `reports/`.
 
 ```bash
 python -m console                  # live detection page, http://localhost:8080
@@ -13,10 +13,9 @@ Team: Vidhi Rojasara (AU2644022) and Kathan Desai (AU2644002).
 
 | Deliverable | Where |
 |---|---|
-| Project report (LaTeX) | `report/report.tex` (compile with pdfLaTeX, e.g. Overleaf) |
-| Presentation, 12 slides (LaTeX Beamer) | `presentation/slides.tex` |
-| Results, one page per experiment | `reports/*.md` (raw numbers in `reports/*.json`); summary in `PROJECT_SUMMARY.md` |
-| Demo | `streamlit run app/dashboard.py`; video script in `presentation/video_script_and_post.md` |
+| Results, one page per experiment | `reports/*.md` (raw numbers in `reports/*.json`) |
+| Live detection page | `python -m console` |
+| Results dashboard | `streamlit run app/dashboard.py` |
 
 ## Status
 
@@ -140,8 +139,8 @@ charts and widgets switch with it.
 **Detail level.** The Audio and RF tabs show their headline result and the
 full reports; the long experiment tables are behind a *Show detailed tables*
 switch. Only values stored in `reports/` are shown (nothing recomputed in the
-dashboard). Each model's training settings and epochs are in the project
-report, `report/report.tex` (Section "Model training details").
+dashboard). Each model's training settings are in its training script under
+`scripts/`.
 
 ## Setup
 
